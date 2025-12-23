@@ -23,10 +23,10 @@
 <script type="importmap">
 {
   "imports": {
-    "react/": "https://esm.sh/react@^19.2.3/",
     "react": "https://esm.sh/react@^19.2.3",
-    "vite": "https://esm.sh/vite@^7.3.0",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "vite": "https://esm.sh/vite@^7.3.0",
     "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
   }
 }
@@ -35,10 +35,7 @@
 <body class="bg-gray-50 text-gray-900 overflow-x-hidden">
   <div id="root"></div>
   
-  <!-- Bu script .tsx dosyalarınızı tarayıcıda anında çalıştırır -->
-  <script type="module">
-    import { run } from "https://esm.sh/run";
-    run("./index.tsx");
-  </script>
+  <!-- Vite veya modern derleyiciler için standart giriş noktası -->
+  <script type="module" src="/index.tsx"></script>
 </body>
 </html>
