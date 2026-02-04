@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { FileSystemService } from './services/fileSystemService';
 import { FileMetadata, FolderData, AppStatus, Notification as NotificationType } from './types';
@@ -115,7 +114,7 @@ const App: React.FC = () => {
               <i className="fas fa-expand text-lg"></i>
             </div>
             <div>
-              <h1 className="text-xl font-black text-gray-900 tracking-tighter leading-none">pixellocallens</h1>
+              <h1 className="text-xl font-black text-gray-900 tracking-tighter leading-none">pixellocallens - görsel galeri</h1>
               <p className="text-[9px] text-indigo-600 font-bold tracking-widest uppercase mt-1">Pro Resolution Engine</p>
             </div>
           </div>
@@ -153,7 +152,7 @@ const App: React.FC = () => {
             </div>
             <h2 className="text-4xl font-black text-gray-900 mb-4 tracking-tight">Pikselleri Gerçek Boyutunda Keşfedin.</h2>
             <p className="text-gray-500 max-w-lg mx-auto mb-10 text-lg leading-relaxed">
-              <b>pixellocallens</b>, yerel klasörlerinizdeki görselleri çözünürlük oranlarına göre ölçeklendirerek size benzersiz bir tarama deneyimi sunar.
+              <b>pixellocallens - görsel galeri</b>, yerel klasörlerinizdeki görselleri çözünürlük oranlarına göre ölçeklendirerek size benzersiz bir tarama deneyimi sunar.
             </p>
             <button 
               onClick={handleOpenFolder}
@@ -255,7 +254,7 @@ const App: React.FC = () => {
 
       <footer className="bg-white border-t border-gray-100 py-12 mt-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-8 text-gray-400 text-[10px] font-black uppercase tracking-[0.3em]">
-          <p>© 2024 pixellocallens Engine. Tüm hakları yereldir.</p>
+          <p>© 2024 pixellocallens - görsel galeri Engine. Tüm hakları yereldir.</p>
           <div className="flex items-center gap-10">
              <div className="flex items-center gap-3">
                <div className="w-2 h-2 rounded-full bg-indigo-500 animate-ping"></div>
