@@ -19,7 +19,9 @@ const FileCard: React.FC<Props> = ({ file, onCopy, maxDimensions }) => {
     
     // Genişliği klasördeki en büyük genişliğe oranla
     // Minimum %15 veriyoruz ki aşırı küçük dosyalar (16x16 iconlar gibi) seçilebilsin
-    const relativeWidth = Math.max(15, (file.width / maxDimensions.width) * 100);
+    const widthRatio = file.width / maxDimensions.width;
+    const heightRatio = file.height / maxDimensions.height;
+    const relativeWidth = Math.max(38, Math.max(widthRatio, heightRatio) * 100);
     
     return {
       width: `${relativeWidth}%`,
@@ -31,7 +33,7 @@ const FileCard: React.FC<Props> = ({ file, onCopy, maxDimensions }) => {
 
   return (
     <div 
-      className="group relative bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 flex flex-col h-full"
+      className="group relative bg-white rounded-2xl shadow-sm border-2 border-gray-300 overflow-hidden hover:shadow-2xl hover:border-indigo-300 transition-all duration-500 transform hover:-translate-y-2 flex flex-col h-full"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -47,9 +49,9 @@ const FileCard: React.FC<Props> = ({ file, onCopy, maxDimensions }) => {
       </div>
 
       {/* Önizleme Alanı - Dinamik Boyutlandırma */}
-      <div className="relative bg-gray-50 flex items-center justify-center p-6 overflow-hidden min-h-[220px]">
+      <div className="relative bg-gray-50 flex items-center justify-center p-4 overflow-hidden min-h-[280px] border-b-2 border-gray-200">
         {isImage ? (
-          <div style={scaleStyles} className="shadow-2xl rounded-lg overflow-hidden bg-white ring-1 ring-gray-200/50 transition-all duration-700 group-hover:ring-indigo-200">
+          <div style={scaleStyles} className="shadow-2xl rounded-lg overflow-hidden bg-white ring-2 ring-gray-300 transition-all duration-700 group-hover:ring-indigo-300">
             <img 
               src={file.previewUrl} 
               alt={file.name} 
@@ -66,28 +68,28 @@ const FileCard: React.FC<Props> = ({ file, onCopy, maxDimensions }) => {
       </div>
 
       {/* Bilgi Paneli */}
-      <div className="p-5 border-t border-gray-50 bg-white flex flex-col justify-between flex-grow">
+      <div className="p-5 border-t-2 border-slate-400 bg-slate-200 flex flex-col justify-between flex-grow">
         <div className="mb-4">
-          <h3 className="text-[12px] font-black text-gray-900 truncate mb-1.5 leading-tight group-hover:text-indigo-600 transition-colors" title={file.name}>
+          <h3 className="text-sm font-black text-gray-900 truncate mb-2 leading-tight group-hover:text-indigo-600 transition-colors" title={file.name}>
             {file.name}
           </h3>
           {isImage && file.width && (
             <div className="flex items-center gap-2">
-              <span className="text-[9px] font-black text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-md uppercase">
+              <span className="text-sm font-black text-indigo-700 bg-white px-3.5 py-1.5 rounded-md uppercase tracking-wide shadow-sm">
                 {file.width} × {file.height}
               </span>
             </div>
           )}
         </div>
         
-        <div className="grid grid-cols-2 gap-x-4 border-t border-gray-50 pt-4 text-[9px] font-black text-gray-400 uppercase tracking-widest">
+        <div className="grid grid-cols-2 gap-x-4 border-t border-slate-400 pt-4 text-xs font-black text-slate-600 uppercase tracking-widest">
           <div className="flex flex-col gap-1">
-            <span className="text-gray-300 text-[8px]">VOLUME</span>
-            <span className="text-gray-800 font-bold">{FileSystemService.formatBytes(file.size)}</span>
+            <span className="text-slate-500 text-[10px]">VOLUME</span>
+            <span className="text-gray-800 text-sm font-bold">{FileSystemService.formatBytes(file.size)}</span>
           </div>
           <div className="flex flex-col gap-1 text-right">
-            <span className="text-gray-300 text-[8px]">MIME</span>
-            <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-sm inline-block self-end">{file.extension}</span>
+            <span className="text-slate-500 text-[10px]">MIME</span>
+            <span className="text-indigo-600 text-sm bg-white px-2.5 py-1 rounded-sm inline-block self-end shadow-sm">{file.extension}</span>
           </div>
         </div>
       </div>

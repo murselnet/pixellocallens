@@ -8,6 +8,9 @@ import { FileMetadata } from '../types';
 export class FileSystemService {
   private static readonly SUPPORTED_IMAGES = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
   private static readonly SUPPORTED_TEXT = ['txt', 'md', 'json'];
+  private static readonly HANDLE_DB_NAME = 'pixellocallens-handles';
+  private static readonly HANDLE_STORE_NAME = 'directories';
+  private static readonly TARGET_DIR_KEY = 'download-target';
 
   /**
    * Tarayıcının modern API'yi destekleyip desteklemediğini kontrol eder.
@@ -145,6 +148,73 @@ export class FileSystemService {
     });
   }
 
+  private static openHandleDb(): Promise<IDBDatabase> {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.HANDLE_DB_NAME, 1);
+
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(this.HANDLE_STORE_NAME)) {
+          db.createObjectStore(this.HANDLE_STORE_NAME);
+        }
+      };
+
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  private static async saveTargetDirectoryHandle(handle: FileSystemDirectoryHandle): Promise<void> {
+    const db = await this.openHandleDb();
+
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(this.HANDLE_STORE_NAME, 'readwrite');
+      tx.objectStore(this.HANDLE_STORE_NAME).put(handle, this.TARGET_DIR_KEY);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+
+    db.close();
+  }
+
+  private static async getSavedTargetDirectoryHandle(): Promise<FileSystemDirectoryHandle | null> {
+    const db = await this.openHandleDb();
+
+    const handle = await new Promise<FileSystemDirectoryHandle | null>((resolve, reject) => {
+      const tx = db.transaction(this.HANDLE_STORE_NAME, 'readonly');
+      const request = tx.objectStore(this.HANDLE_STORE_NAME).get(this.TARGET_DIR_KEY);
+      request.onsuccess = () => resolve((request.result as FileSystemDirectoryHandle | undefined) ?? null);
+      request.onerror = () => reject(request.error);
+    });
+
+    db.close();
+    return handle;
+  }
+
+  private static async requestDirectoryPermission(handle: FileSystemDirectoryHandle): Promise<boolean> {
+    const readWriteMode = { mode: 'readwrite' as const };
+    const permissionHandle = handle as any;
+
+    if ((await permissionHandle.queryPermission(readWriteMode)) === 'granted') {
+      return true;
+    }
+
+    return (await permissionHandle.requestPermission(readWriteMode)) === 'granted';
+  }
+
+  private static async getTargetDirectoryHandle(): Promise<FileSystemDirectoryHandle> {
+    const savedHandle = await this.getSavedTargetDirectoryHandle();
+
+    if (savedHandle && await this.requestDirectoryPermission(savedHandle)) {
+      return savedHandle;
+    }
+
+    const targetDirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite' });
+    await this.saveTargetDirectoryHandle(targetDirHandle);
+    return targetDirHandle;
+  }
+
   static async copyFileToFolder(fileName: string, blobUrl: string): Promise<void> {
     try {
       const response = await fetch(blobUrl);
@@ -152,7 +222,7 @@ export class FileSystemService {
       
       if (this.isSupported()) {
         try {
-          const targetDirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite' });
+          const targetDirHandle = await this.getTargetDirectoryHandle();
           const newFileHandle = await targetDirHandle.getFileHandle(fileName, { create: true });
           const writable = await newFileHandle.createWritable();
           await writable.write(blob);
