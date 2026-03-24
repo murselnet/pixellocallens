@@ -1,101 +1,110 @@
-
 import { FileMetadata } from '../types';
 
-/**
- * World-class service for local file system operations.
- * Handles both modern File System Access API and legacy fallback for framed environments.
- */
 export class FileSystemService {
   private static readonly SUPPORTED_IMAGES = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
-  private static readonly SUPPORTED_TEXT = ['txt', 'md', 'json'];
   private static readonly HANDLE_DB_NAME = 'pixellocallens-handles';
   private static readonly HANDLE_STORE_NAME = 'directories';
   private static readonly TARGET_DIR_KEY = 'download-target';
 
-  /**
-   * Tarayıcının modern API'yi destekleyip desteklemediğini kontrol eder.
-   */
   static isSupported(): boolean {
     return 'showDirectoryPicker' in window;
   }
 
-  /**
-   * Dosyaları önce görsellere göre, sonra isme göre sıralar.
-   */
+  static isImageFile(file: FileMetadata): boolean {
+    return this.SUPPORTED_IMAGES.includes(file.extension.toLowerCase());
+  }
+
   private static sortFiles(files: FileMetadata[]): FileMetadata[] {
     return files.sort((a, b) => {
-      const isAImage = this.SUPPORTED_IMAGES.includes(a.extension.toLowerCase());
-      const isBImage = this.SUPPORTED_IMAGES.includes(b.extension.toLowerCase());
+      const isAImage = this.isImageFile(a);
+      const isBImage = this.isImageFile(b);
 
-      // Eğer biri görsel diğeri değilse, görsel olan üstte çıkar
       if (isAImage && !isBImage) return -1;
       if (!isAImage && isBImage) return 1;
 
-      // Aynı türdelerse alfabetik sırala
-      return a.name.localeCompare(b.name);
+      return a.name.localeCompare(b.name, 'tr');
     });
   }
 
-  /**
-   * Modern API (showDirectoryPicker) veya Fallback (input) kullanarak klasör açar.
-   */
   static async openDirectory(): Promise<{ name: string; files: FileMetadata[] }> {
     try {
-      const dirHandle = await (window as any).showDirectoryPicker({
+      const dirHandle = await (window as unknown as { showDirectoryPicker: Function }).showDirectoryPicker({
         mode: 'readwrite'
       });
-      
-      const files: FileMetadata[] = [];
 
-      for await (const entry of dirHandle.values()) {
-        if (entry.kind === 'file') {
-          const file = await entry.getFile();
-          const metadata = await this.processFile(file, this.SUPPORTED_IMAGES, this.SUPPORTED_TEXT);
-          if (metadata) files.push(metadata);
-        }
-      }
+      const files = await this.readDirectoryRecursive(dirHandle);
 
       return {
         name: dirHandle.name,
         files: this.sortFiles(files)
       };
     } catch (err: any) {
-      if (err.name === 'SecurityError' || err.message.includes('sub frames')) {
-        console.warn("Modern API engellendi, yedek yönteme (input) geçiliyor...");
+      if (err.name === 'SecurityError' || String(err.message).includes('sub frames')) {
+        console.warn('Modern API engellendi, yedek yonteme geciliyor...');
         return this.openDirectoryFallback();
       }
-      
+
       if (err.name === 'AbortError') {
-        throw new Error('Klasör seçimi iptal edildi.');
+        throw new Error('Klasor secimi iptal edildi.');
       }
+
       throw err;
     }
   }
 
-  /**
-   * Yedek yöntem: Gizli bir input elementi kullanarak klasör seçimi.
-   */
+  private static async readDirectoryRecursive(
+    dirHandle: FileSystemDirectoryHandle,
+    basePath = ''
+  ): Promise<FileMetadata[]> {
+    const files: FileMetadata[] = [];
+
+    const iterableHandle = dirHandle as any;
+
+    for await (const entry of iterableHandle.values()) {
+      const entryPath = basePath ? `${basePath}/${entry.name}` : entry.name;
+
+      if (entry.kind === 'directory') {
+        const nestedFiles = await this.readDirectoryRecursive(entry, entryPath);
+        files.push(...nestedFiles);
+        continue;
+      }
+
+      const file = await entry.getFile();
+      const metadata = await this.processFile(file, entryPath);
+      if (metadata) {
+        files.push(metadata);
+      }
+    }
+
+    return files;
+  }
+
   private static openDirectoryFallback(): Promise<{ name: string; files: FileMetadata[] }> {
     return new Promise((resolve, reject) => {
       const input = document.createElement('input');
       input.type = 'file';
-      (input as any).webkitdirectory = true;
-      (input as any).directory = true;
+      (input as HTMLInputElement & { webkitdirectory?: boolean; directory?: boolean }).webkitdirectory = true;
+      (input as HTMLInputElement & { webkitdirectory?: boolean; directory?: boolean }).directory = true;
 
-      input.onchange = async (e: any) => {
-        const selectedFiles: FileList = e.target.files;
+      input.onchange = async (event: Event) => {
+        const target = event.target as HTMLInputElement;
+        const selectedFiles = target.files;
+
         if (!selectedFiles || selectedFiles.length === 0) {
-          reject(new Error('Klasör seçilmedi.'));
+          reject(new Error('Klasor secilmedi.'));
           return;
         }
 
         const files: FileMetadata[] = [];
-        const folderName = selectedFiles[0].webkitRelativePath.split('/')[0] || 'Seçilen Klasör';
+        const firstPath = (selectedFiles[0] as File & { webkitRelativePath?: string }).webkitRelativePath || '';
+        const folderName = firstPath.split('/')[0] || 'Secilen Klasor';
 
-        for (let i = 0; i < selectedFiles.length; i++) {
-          const file = selectedFiles[i];
-          const metadata = await this.processFile(file, this.SUPPORTED_IMAGES, this.SUPPORTED_TEXT);
-          if (metadata) files.push(metadata);
+        for (let index = 0; index < selectedFiles.length; index += 1) {
+          const file = selectedFiles[index] as File & { webkitRelativePath?: string };
+          const metadata = await this.processFile(file, file.webkitRelativePath || file.name);
+          if (metadata) {
+            files.push(metadata);
+          }
         }
 
         resolve({
@@ -104,39 +113,37 @@ export class FileSystemService {
         });
       };
 
-      input.oncancel = () => reject(new Error('Klasör seçimi iptal edildi.'));
+      input.oncancel = () => reject(new Error('Klasor secimi iptal edildi.'));
       input.click();
     });
   }
 
-  /**
-   * Dosyayı işleyip meta verilerini çıkaran ortak fonksiyon.
-   */
-  private static async processFile(file: File, supportedImages: string[], supportedText: string[]): Promise<FileMetadata | null> {
+  private static async processFile(file: File, relativePath: string): Promise<FileMetadata | null> {
     const ext = file.name.split('.').pop()?.toLowerCase() || '';
-    
-    if (supportedImages.includes(ext) || supportedText.includes(ext)) {
-      const metadata: FileMetadata = {
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        extension: ext.toUpperCase(),
-        lastModified: file.lastModified,
-        previewUrl: URL.createObjectURL(file)
-      };
 
-      if (supportedImages.includes(ext)) {
-        try {
-          const dimensions = await this.getImageDimensions(metadata.previewUrl);
-          metadata.width = dimensions.width;
-          metadata.height = dimensions.height;
-        } catch (e) {
-          console.warn(`Boyut alınamadı: ${file.name}`);
-        }
-      }
-      return metadata;
+    if (!this.SUPPORTED_IMAGES.includes(ext)) {
+      return null;
     }
-    return null;
+
+    const metadata: FileMetadata = {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      extension: ext.toUpperCase(),
+      lastModified: file.lastModified,
+      previewUrl: URL.createObjectURL(file),
+      relativePath
+    };
+
+    try {
+      const dimensions = await this.getImageDimensions(metadata.previewUrl);
+      metadata.width = dimensions.width;
+      metadata.height = dimensions.height;
+    } catch {
+      console.warn(`Boyut alinamadi: ${file.name}`);
+    }
+
+    return metadata;
   }
 
   private static getImageDimensions(url: string): Promise<{ width: number; height: number }> {
@@ -145,6 +152,14 @@ export class FileSystemService {
       img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
       img.onerror = reject;
       img.src = url;
+    });
+  }
+
+  static releaseFiles(files: FileMetadata[]): void {
+    files.forEach((file) => {
+      if (file.previewUrl) {
+        URL.revokeObjectURL(file.previewUrl);
+      }
     });
   }
 
@@ -206,11 +221,14 @@ export class FileSystemService {
   private static async getTargetDirectoryHandle(): Promise<FileSystemDirectoryHandle> {
     const savedHandle = await this.getSavedTargetDirectoryHandle();
 
-    if (savedHandle && await this.requestDirectoryPermission(savedHandle)) {
+    if (savedHandle && (await this.requestDirectoryPermission(savedHandle))) {
       return savedHandle;
     }
 
-    const targetDirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite' });
+    const targetDirHandle = await (window as unknown as { showDirectoryPicker: Function }).showDirectoryPicker({
+      mode: 'readwrite'
+    });
+
     await this.saveTargetDirectoryHandle(targetDirHandle);
     return targetDirHandle;
   }
@@ -219,7 +237,7 @@ export class FileSystemService {
     try {
       const response = await fetch(blobUrl);
       const blob = await response.blob();
-      
+
       if (this.isSupported()) {
         try {
           const targetDirHandle = await this.getTargetDirectoryHandle();
@@ -228,27 +246,39 @@ export class FileSystemService {
           await writable.write(blob);
           await writable.close();
           return;
-        } catch (e) {
-          console.warn("Modern kopyalama başarısız, indirme yöntemine geçiliyor.");
+        } catch {
+          console.warn('Modern kaydetme basarisiz, indirme yontemine geciliyor.');
         }
       }
 
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = fileName;
-      a.click();
+      const anchor = document.createElement('a');
+      anchor.href = blobUrl;
+      anchor.download = fileName;
+      anchor.click();
     } catch (err: any) {
-      if (err.name === 'AbortError') return;
-      throw new Error(`İşlem başarısız: ${err.message}`);
+      if (err.name === 'AbortError') {
+        return;
+      }
+
+      throw new Error(`Islem basarisiz: ${err.message}`);
     }
   }
 
   static formatBytes(bytes: number, decimals = 2): string {
     if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const dm = decimals < 0 ? 0 : decimals;
+
+    const kiloByte = 1024;
+    const precision = decimals < 0 ? 0 : decimals;
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    const unitIndex = Math.floor(Math.log(bytes) / Math.log(kiloByte));
+
+    return `${parseFloat((bytes / Math.pow(kiloByte, unitIndex)).toFixed(precision))} ${sizes[unitIndex]}`;
+  }
+
+  static formatDate(timestamp: number): string {
+    return new Intl.DateTimeFormat('tr-TR', {
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    }).format(timestamp);
   }
 }

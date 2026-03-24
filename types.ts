@@ -8,6 +8,7 @@ export interface FileMetadata {
   width?: number;
   height?: number;
   previewUrl: string;
+  relativePath?: string;
 }
 
 export interface FolderData {

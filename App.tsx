@@ -1,41 +1,64 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { FileSystemService } from './services/fileSystemService';
-import { FileMetadata, FolderData, AppStatus, Notification as NotificationType } from './types';
+import { AppStatus, FileMetadata, FolderData, Notification as NotificationType } from './types';
 import FileCard from './components/FileCard';
 import Notification from './components/Notification';
+import PreviewModal from './components/PreviewModal';
+
+type SortOption = 'name' | 'size' | 'modified' | 'resolution';
+type OrientationFilter = 'all' | 'landscape' | 'portrait' | 'square';
+
+const IMAGE_EXTENSIONS = ['JPG', 'JPEG', 'PNG', 'WEBP', 'GIF'];
 
 const App: React.FC = () => {
   const [status, setStatus] = useState<AppStatus>(AppStatus.IDLE);
   const [folder, setFolder] = useState<FolderData | null>(null);
   const [notifications, setNotifications] = useState<NotificationType[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  
+  const [sortBy, setSortBy] = useState<SortOption>('resolution');
+  const [orientationFilter, setOrientationFilter] = useState<OrientationFilter>('all');
+  const [selectedFile, setSelectedFile] = useState<FileMetadata | null>(null);
   const [isModernApiAvailable, setIsModernApiAvailable] = useState(true);
+
+  const deferredSearchQuery = useDeferredValue(searchQuery);
 
   useEffect(() => {
     setIsModernApiAvailable(FileSystemService.isSupported());
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (folder?.files) {
+        FileSystemService.releaseFiles(folder.files);
+      }
+    };
+  }, [folder]);
+
   const addNotification = (message: string, type: NotificationType['type'] = 'info') => {
-    const id = Date.now();
-    setNotifications(prev => [...prev, { id, message, type }]);
+    setNotifications((prev) => [...prev, { id: Date.now() + Math.random(), message, type }]);
   };
 
   const removeNotification = (id: number) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
+    setNotifications((prev) => prev.filter((notification) => notification.id !== id));
   };
 
   const handleOpenFolder = async () => {
     try {
       setStatus(AppStatus.LOADING);
+      setSelectedFile(null);
       const data = await FileSystemService.openDirectory();
-      setFolder(data);
+      setFolder((prev) => {
+        if (prev?.files) {
+          FileSystemService.releaseFiles(prev.files);
+        }
+        return data;
+      });
       setStatus(AppStatus.LOADED);
-      addNotification(`"${data.name}" klasörü başarıyla tarandı.`, 'success');
+      addNotification(`"${data.name}" klasoru ve alt klasorleri tarandi.`, 'success');
     } catch (err) {
       setStatus(AppStatus.IDLE);
       const message = (err as Error).message;
-      if (!message.includes('iptal edildi')) {
+      if (!message.toLowerCase().includes('iptal')) {
         addNotification(message, 'error');
       }
     }
@@ -44,179 +67,267 @@ const App: React.FC = () => {
   const handleCopyFile = async (file: FileMetadata) => {
     try {
       await FileSystemService.copyFileToFolder(file.name, file.previewUrl);
-      const actionLabel = isModernApiAvailable ? 'kopyalandı' : 'indirildi';
-      addNotification(`${file.name} başarıyla ${actionLabel}.`, 'success');
+      addNotification(
+        `${file.name} basariyla ${isModernApiAvailable ? 'kaydedildi' : 'indirildi'}.`,
+        'success'
+      );
     } catch (err) {
       const message = (err as Error).message;
-      if (!message.includes('iptal edildi')) {
-        addNotification(`İşlem başarısız: ${message}`, 'error');
+      if (!message.toLowerCase().includes('iptal')) {
+        addNotification(`Islem basarisiz: ${message}`, 'error');
       }
     }
   };
 
-  // Filtrelenmiş dosyalar
-  const filteredFiles = useMemo(() => {
-    return folder?.files.filter(f => 
-      f.name.toLowerCase().includes(searchQuery.toLowerCase())
-    ) || [];
-  }, [folder, searchQuery]);
-
-  const imageExtensions = ['JPG', 'JPEG', 'PNG', 'WEBP', 'GIF'];
-
-  // Global maksimum boyutları hesapla (Gerçek orantılı ölçeklendirme için kritik)
-  const maxDimensions = useMemo(() => {
-    let maxW = 0;
-    let maxH = 0;
-    filteredFiles.forEach(f => {
-      if (imageExtensions.includes(f.extension) && f.width && f.height) {
-        if (f.width > maxW) maxW = f.width;
-        if (f.height > maxH) maxH = f.height;
+  const compareFiles = (left: FileMetadata, right: FileMetadata) => {
+    switch (sortBy) {
+      case 'size':
+        return right.size - left.size || left.name.localeCompare(right.name, 'tr');
+      case 'modified':
+        return right.lastModified - left.lastModified || left.name.localeCompare(right.name, 'tr');
+      case 'resolution': {
+        const leftPixels = (left.width || 0) * (left.height || 0);
+        const rightPixels = (right.width || 0) * (right.height || 0);
+        return rightPixels - leftPixels || left.name.localeCompare(right.name, 'tr');
       }
-    });
-    return { width: maxW || 1, height: maxH || 1 };
+      case 'name':
+      default:
+        return left.name.localeCompare(right.name, 'tr');
+    }
+  };
+
+  const filteredFiles = useMemo(() => {
+    if (!folder) {
+      return [];
+    }
+
+    return folder.files
+      .filter((file) => file.name.toLowerCase().includes(deferredSearchQuery.toLowerCase()))
+      .filter((file) => {
+        if (orientationFilter === 'all' || !FileSystemService.isImageFile(file) || !file.width || !file.height) {
+          return true;
+        }
+
+        if (orientationFilter === 'landscape') return file.width > file.height;
+        if (orientationFilter === 'portrait') return file.height > file.width;
+        if (orientationFilter === 'square') return file.width === file.height;
+        return true;
+      })
+      .slice()
+      .sort(compareFiles);
+  }, [compareFiles, deferredSearchQuery, folder, orientationFilter]);
+
+  const maxDimensions = useMemo(() => {
+    return filteredFiles.reduce(
+      (acc, file) => {
+        if (IMAGE_EXTENSIONS.includes(file.extension) && file.width && file.height) {
+          acc.width = Math.max(acc.width, file.width);
+          acc.height = Math.max(acc.height, file.height);
+        }
+        return acc;
+      },
+      { width: 1, height: 1 }
+    );
   }, [filteredFiles]);
 
-  // Dosyaları ayır ve görselleri çözünürlüğe göre grupla
-  const { resolutionGroups, otherFiles } = useMemo(() => {
-    const images = filteredFiles.filter(f => imageExtensions.includes(f.extension));
-    const others = filteredFiles.filter(f => !imageExtensions.includes(f.extension));
-
+  const resolutionGroups = useMemo(() => {
+    const images = filteredFiles.filter((file) => IMAGE_EXTENSIONS.includes(file.extension));
     const groups: Record<string, FileMetadata[]> = {};
-    images.forEach(img => {
-      const resKey = img.width && img.height ? `${img.width}x${img.height}` : 'Bilinmiyor';
-      if (!groups[resKey]) groups[resKey] = [];
-      groups[resKey].push(img);
+
+    images.forEach((image) => {
+      const resolution = image.width && image.height ? `${image.width}x${image.height}` : 'Bilinmiyor';
+      if (!groups[resolution]) {
+        groups[resolution] = [];
+      }
+      groups[resolution].push(image);
     });
 
-    const sortedGroupKeys = Object.keys(groups).sort((a, b) => {
-      if (a === 'Bilinmiyor') return 1;
-      if (b === 'Bilinmiyor') return -1;
-      const [aw, ah] = a.split('x').map(Number);
-      const [bw, bh] = b.split('x').map(Number);
-      return (aw * ah) - (bw * bh);
+    const sortedGroupKeys = Object.keys(groups).sort((left, right) => {
+      if (left === 'Bilinmiyor') return 1;
+      if (right === 'Bilinmiyor') return -1;
+
+      const [leftWidth, leftHeight] = left.split('x').map(Number);
+      const [rightWidth, rightHeight] = right.split('x').map(Number);
+      return rightWidth * rightHeight - leftWidth * leftHeight;
     });
 
+    return sortedGroupKeys.map((key) => ({
+      resolution: key,
+      files: groups[key]
+    }));
+  }, [filteredFiles]);
+
+  const stats = useMemo(() => {
+    const imageCount = filteredFiles.filter((file) => FileSystemService.isImageFile(file)).length;
     return {
-      resolutionGroups: sortedGroupKeys.map(key => ({
-        resolution: key,
-        files: groups[key].sort((a, b) => a.name.localeCompare(b.name))
-      })),
-      otherFiles: others.sort((a, b) => a.name.localeCompare(b.name))
+      total: filteredFiles.length,
+      images: imageCount
     };
   }, [filteredFiles]);
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg rotate-3">
+    <div className="min-h-screen bg-gray-50">
+      <header className="sticky top-0 z-30 border-b border-gray-200 bg-white/90 backdrop-blur-md shadow-sm">
+        <div className="mx-auto flex h-auto max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8 lg:h-20 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg">
               <i className="fas fa-expand text-lg"></i>
             </div>
             <div>
-              <h1 className="text-xl font-black text-gray-900 tracking-tighter leading-none">pixellocallens - görsel galeri</h1>
-              <p className="text-[9px] text-indigo-600 font-bold tracking-widest uppercase mt-1">Pro Resolution Engine</p>
+              <h1 className="text-xl font-black leading-none tracking-tight text-gray-900">PixelLocalLens</h1>
+              <p className="mt-1 text-[10px] font-black uppercase tracking-[0.35em] text-indigo-600">
+                Local Resolution Explorer
+              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
             {folder && (
-              <div className="hidden md:flex relative group">
-                <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
-                <input 
-                  type="text" 
+              <div className="relative">
+                <i className="fas fa-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400"></i>
+                <input
+                  type="text"
                   placeholder="Dosya ara..."
-                  className="pl-9 pr-4 py-1.5 bg-gray-100 border-transparent focus:bg-white focus:ring-2 focus:ring-indigo-500 rounded-full text-sm transition-all w-64 outline-none"
+                  className="w-full rounded-full bg-gray-100 py-2 pl-9 pr-4 text-sm outline-none transition-all focus:bg-white focus:ring-2 focus:ring-indigo-500 lg:w-72"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(event) => setSearchQuery(event.target.value)}
                 />
               </div>
             )}
-            <button 
+
+            <button
+              type="button"
               onClick={handleOpenFolder}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-full text-sm font-bold transition-all shadow-md hover:shadow-indigo-200 active:scale-95 flex items-center gap-2"
+              className="flex items-center justify-center gap-2 rounded-full bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:bg-indigo-700 hover:shadow-indigo-200 active:scale-95"
             >
               <i className="fas fa-folder-open"></i>
-              {folder ? 'YENİ KLASÖR' : 'BAŞLA'}
+              {folder ? 'Yeni klasor sec' : 'Klasor tara'}
             </button>
           </div>
         </div>
       </header>
 
-      <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+      <main className="mx-auto flex w-full max-w-7xl flex-grow flex-col px-4 py-8 sm:px-6 lg:px-8">
         {status === AppStatus.IDLE && !folder && (
-          <div className="h-[60vh] flex flex-col items-center justify-center text-center animate-fade-in">
+          <section className="flex h-[60vh] flex-col items-center justify-center text-center">
             <div className="relative mb-8">
-               <div className="absolute -inset-4 bg-indigo-100 rounded-full blur-2xl opacity-50"></div>
-               <i className="fas fa-images text-7xl text-indigo-600 relative"></i>
+              <div className="absolute -inset-4 rounded-full bg-indigo-100 opacity-50 blur-2xl"></div>
+              <i className="fas fa-images relative text-7xl text-indigo-600"></i>
             </div>
-            <h2 className="text-4xl font-black text-gray-900 mb-4 tracking-tight">Pikselleri Gerçek Boyutunda Keşfedin.</h2>
-            <p className="text-gray-500 max-w-lg mx-auto mb-10 text-lg leading-relaxed">
-              <b>pixellocallens - görsel galeri</b>, yerel klasörlerinizdeki görselleri çözünürlük oranlarına göre ölçeklendirerek size benzersiz bir tarama deneyimi sunar.
+            <h2 className="mb-4 text-4xl font-black tracking-tight text-gray-900">Gorsellerinizi gercek oranlariyla kesfedin.</h2>
+            <p className="mx-auto mb-10 max-w-2xl text-lg leading-relaxed text-gray-500">
+              Yerel klasorlerinizi ve alt klasorlerinizi tarayin, gorselleri cozunurluge gore gruplayin, dosyalari
+              filtreleyin ve tek tikla buyuk onizleme acin.
             </p>
-            <button 
+            <button
+              type="button"
               onClick={handleOpenFolder}
-              className="bg-gray-900 hover:bg-black text-white px-10 py-4 rounded-full text-lg font-bold transition-all shadow-2xl hover:scale-105 active:scale-95 flex items-center gap-3"
+              className="flex items-center gap-3 rounded-full bg-gray-900 px-10 py-4 text-lg font-bold text-white shadow-2xl transition-all hover:scale-105 hover:bg-black active:scale-95"
             >
               <i className="fas fa-rocket"></i>
-              KLASÖR TARAMAYI BAŞLAT
+              Klasor taramayi baslat
             </button>
-          </div>
+          </section>
         )}
 
         {status === AppStatus.LOADING && (
-          <div className="flex flex-col items-center justify-center py-32 animate-pulse">
-            <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-6"></div>
-            <p className="text-indigo-600 font-black uppercase tracking-widest text-xs">Pikseller Analiz Ediliyor...</p>
-          </div>
+          <section className="flex flex-col items-center justify-center py-32">
+            <div className="mb-6 h-16 w-16 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent"></div>
+            <p className="text-xs font-black uppercase tracking-[0.35em] text-indigo-600">Dosyalar taraniyor...</p>
+          </section>
         )}
 
         {folder && (
           <div className="animate-fade-in">
-            <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 pb-8 border-b border-gray-100">
-              <div>
-                <nav className="flex items-center gap-2 text-[10px] font-black text-indigo-600 mb-3 tracking-[0.2em] uppercase">
-                  <i className="fas fa-link"></i>
-                  <span>LOCAL</span>
-                  <i className="fas fa-chevron-right text-[7px] text-gray-300"></i>
-                  <span className="text-gray-400">{folder.name}</span>
-                </nav>
-                <h2 className="text-5xl font-black text-gray-900 tracking-tighter">
-                  Medyalarınız
-                  <span className="ml-4 text-sm font-bold text-indigo-400 bg-indigo-50 px-4 py-2 rounded-2xl align-middle tracking-normal">
-                    {filteredFiles.length} Öğe Bulundu
-                  </span>
-                </h2>
-              </div>
-            </div>
+            <section className="mb-10 rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
+              <div className="mb-6 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <nav className="mb-3 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.25em] text-indigo-600">
+                    <i className="fas fa-folder-tree"></i>
+                    <span>LOCAL</span>
+                    <i className="fas fa-chevron-right text-[7px] text-gray-300"></i>
+                    <span className="text-gray-400">{folder.name}</span>
+                  </nav>
+                  <h2 className="text-4xl font-black tracking-tight text-gray-900">Medyalariniz</h2>
+                  <p className="mt-2 text-sm text-gray-500">
+                    Alt klasorler dahil taranan dosyalar burada listelenir. Buyuk onizleme icin gorsele tiklayin.
+                  </p>
+                </div>
 
-            <div className="space-y-24">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl bg-indigo-50 px-4 py-3">
+                    <div className="text-[11px] font-black uppercase tracking-[0.25em] text-indigo-400">Toplam</div>
+                    <div className="mt-2 text-2xl font-black text-indigo-700">{stats.total}</div>
+                  </div>
+                  <div className="rounded-2xl bg-emerald-50 px-4 py-3">
+                    <div className="text-[11px] font-black uppercase tracking-[0.25em] text-emerald-400">Gorsel</div>
+                    <div className="mt-2 text-2xl font-black text-emerald-700">{stats.images}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_220px]">
+                <label className="flex flex-col gap-2">
+                  <span className="text-[11px] font-black uppercase tracking-[0.3em] text-gray-400">Siralama</span>
+                  <select
+                    className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-700 outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+                    value={sortBy}
+                    onChange={(event) => setSortBy(event.target.value as SortOption)}
+                  >
+                    <option value="resolution">Cozunurluge gore</option>
+                    <option value="name">Isme gore</option>
+                    <option value="size">Boyuta gore</option>
+                    <option value="modified">Tarihe gore</option>
+                  </select>
+                </label>
+
+                <label className="flex flex-col gap-2">
+                  <span className="text-[11px] font-black uppercase tracking-[0.3em] text-gray-400">Yonelim</span>
+                  <select
+                    className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-700 outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+                    value={orientationFilter}
+                    onChange={(event) => setOrientationFilter(event.target.value as OrientationFilter)}
+                  >
+                    <option value="all">Hepsi</option>
+                    <option value="landscape">Yatay</option>
+                    <option value="portrait">Dikey</option>
+                    <option value="square">Kare</option>
+                  </select>
+                </label>
+              </div>
+            </section>
+
+            <section className="space-y-24">
               {resolutionGroups.length > 0 && (
                 <section>
-                  <div className="flex items-center gap-4 mb-12">
-                    <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-xl shadow-indigo-100">
+                  <div className="mb-12 flex items-center gap-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-xl shadow-indigo-100">
                       <i className="fas fa-layer-group text-xl"></i>
                     </div>
-                    <h3 className="text-3xl font-black text-gray-900 uppercase tracking-tighter">Görsel Kanvası</h3>
+                    <div>
+                      <h3 className="text-3xl font-black uppercase tracking-tight text-gray-900">Gorsel kanvasi</h3>
+                      <p className="mt-1 text-sm text-gray-500">Ayni cozunurlukteki dosyalar birlikte listelenir.</p>
+                    </div>
                   </div>
-                  
+
                   <div className="space-y-20">
                     {resolutionGroups.map((group) => (
-                      <div key={group.resolution} className="animate-fade-in">
-                        <div className="flex items-center gap-6 mb-8">
-                          <h4 className="text-[12px] font-black text-indigo-700 bg-white px-5 py-2.5 rounded-xl border border-indigo-100 whitespace-nowrap shadow-sm">
+                      <div key={group.resolution}>
+                        <div className="mb-8 flex items-center gap-6">
+                          <h4 className="whitespace-nowrap rounded-xl border border-indigo-100 bg-white px-5 py-2.5 text-[12px] font-black text-indigo-700 shadow-sm">
                             <i className="fas fa-expand-arrows-alt mr-3 text-indigo-300"></i>
-                            {group.resolution.replace('x', ' × ')}
+                            {group.resolution.replace('x', ' x ')}
                           </h4>
                           <div className="h-[2px] flex-grow bg-gradient-to-r from-indigo-50 via-gray-100 to-transparent"></div>
                         </div>
-                        
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-10 items-end">
-                          {group.files.map((file, idx) => (
-                            <FileCard 
-                              key={`img-${file.name}-${idx}`} 
-                              file={file} 
+
+                        <div className="grid grid-cols-1 items-end gap-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                          {group.files.map((file) => (
+                            <FileCard
+                              key={`${file.relativePath || file.name}-${file.lastModified}`}
+                              file={file}
                               onCopy={handleCopyFile}
+                              onPreview={setSelectedFile}
                               maxDimensions={maxDimensions}
                             />
                           ))}
@@ -227,46 +338,34 @@ const App: React.FC = () => {
                 </section>
               )}
 
-              {otherFiles.length > 0 && (
-                <section className="pt-16 border-t border-gray-100">
-                  <div className="flex items-center gap-4 mb-12">
-                    <div className="w-12 h-12 rounded-2xl bg-gray-900 text-white flex items-center justify-center shadow-xl shadow-gray-200">
-                      <i className="fas fa-file-alt text-xl"></i>
-                    </div>
-                    <h3 className="text-3xl font-black text-gray-900 uppercase tracking-tighter">Dosya Arşivi</h3>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-10 items-end">
-                    {otherFiles.map((file, idx) => (
-                      <FileCard 
-                        key={`other-${file.name}-${idx}`} 
-                        file={file} 
-                        onCopy={handleCopyFile}
-                      />
-                    ))}
-                  </div>
+              {filteredFiles.length === 0 && (
+                <section className="rounded-[28px] border border-dashed border-gray-300 bg-white px-6 py-16 text-center">
+                  <p className="text-xl font-black text-gray-900">Sonuc bulunamadi</p>
+                  <p className="mt-2 text-gray-500">
+                    Arama kelimesini veya filtreleri degistirerek dosyalarinizi yeniden listeleyebilirsiniz.
+                  </p>
                 </section>
               )}
-            </div>
+            </section>
           </div>
         )}
       </main>
 
-      <footer className="bg-white border-t border-gray-100 py-12 mt-24">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-8 text-gray-400 text-[10px] font-black uppercase tracking-[0.3em]">
-          <p>© 2024 pixellocallens - görsel galeri Engine. Tüm hakları yereldir.</p>
-          <div className="flex items-center gap-10">
-             <div className="flex items-center gap-3">
-               <div className="w-2 h-2 rounded-full bg-indigo-500 animate-ping"></div>
-               <span className="text-indigo-600">Local Lens Pro Active</span>
-             </div>
+      <footer className="mt-24 border-t border-gray-100 bg-white py-12">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 px-4 text-[10px] font-black uppercase tracking-[0.3em] text-gray-400 sm:px-6 lg:flex-row lg:px-8">
+          <p>PixelLocalLens yerel dosyalarinizla calisir. Veriler tarayiciniz disina cikarilmaz.</p>
+          <div className="flex items-center gap-3 text-indigo-600">
+            <div className="h-2 w-2 animate-ping rounded-full bg-indigo-500"></div>
+            <span>Yerel galeri hazir</span>
           </div>
         </div>
       </footer>
 
+      <PreviewModal file={selectedFile} onClose={() => setSelectedFile(null)} />
+
       <div className="fixed bottom-8 right-8 z-50 flex flex-col items-end gap-3">
-        {notifications.map(n => (
-          <Notification key={n.id} notification={n} onClose={removeNotification} />
+        {notifications.map((notification) => (
+          <Notification key={notification.id} notification={notification} onClose={removeNotification} />
         ))}
       </div>
     </div>
