@@ -22,6 +22,14 @@ export interface Notification {
   type: 'success' | 'error' | 'info';
 }
 
+export interface UpdateStatusPayload {
+  status: 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error' | 'dev-mode';
+  message: string;
+  version?: string;
+  progress?: number;
+  source?: 'manual' | 'background';
+}
+
 export enum AppStatus {
   IDLE = 'IDLE',
   LOADING = 'LOADING',

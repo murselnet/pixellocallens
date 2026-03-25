@@ -3,16 +3,26 @@ import FileCard from './components/FileCard';
 import Notification from './components/Notification';
 import PreviewModal from './components/PreviewModal';
 import { desktopApi } from './services/desktopApi';
-import { AppStatus, FileMetadata, FolderData, Notification as NotificationType, OrientationFilter, SortOption } from './types';
+import {
+  AppStatus,
+  FileMetadata,
+  FolderData,
+  Notification as NotificationType,
+  OrientationFilter,
+  SortOption,
+  UpdateStatusPayload
+} from './types';
 
 const fileNameCollator = new Intl.Collator('tr', {
   numeric: true,
   sensitivity: 'base'
 });
 
+const appIconUrl = new URL('./app-icon.png', window.location.href).toString();
+
 const getFolderLabel = (fullPath: string | null) => {
   if (!fullPath) {
-    return 'Henüz seçilmedi';
+    return 'Henuz secilmedi';
   }
 
   return fullPath.split(/[/\\]/).filter(Boolean).pop() ?? fullPath;
@@ -27,6 +37,8 @@ const App = () => {
   const [orientationFilter, setOrientationFilter] = useState<OrientationFilter>('all');
   const [selectedFile, setSelectedFile] = useState<FileMetadata | null>(null);
   const [notifications, setNotifications] = useState<NotificationType[]>([]);
+  const [appVersion, setAppVersion] = useState('');
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatusPayload | null>(null);
 
   const deferredSearch = useDeferredValue(searchQuery);
 
@@ -40,10 +52,59 @@ const App = () => {
 
   useEffect(() => {
     desktopApi
+      .getAppVersion()
+      .then(({ version }) => setAppVersion(version))
+      .catch(() => setAppVersion(''));
+
+    desktopApi
       .getTargetDirectory()
       .then(({ targetDirectory }) => setTargetDirectory(targetDirectory))
       .catch(() => setTargetDirectory(null));
+
+    const unsubscribe = desktopApi.onUpdateStatus((payload) => {
+      setUpdateStatus(payload);
+
+      if (payload.status === 'available') {
+        notify(payload.message, 'info');
+      }
+
+      if (payload.status === 'downloaded') {
+        notify(payload.message, 'success');
+      }
+
+      if (payload.status === 'error') {
+        notify(payload.message, 'error');
+      }
+
+      if ((payload.status === 'not-available' || payload.status === 'dev-mode') && payload.source === 'manual') {
+        notify(payload.message, 'info');
+      }
+    });
+
+    return unsubscribe;
   }, []);
+
+  const handleCheckForUpdates = async () => {
+    try {
+      const result = await desktopApi.checkForUpdates();
+      if (!result.started && result.reason === 'busy') {
+        notify('Su anda zaten bir guncelleme kontrolu ya da indirme islemi suruyor.', 'info');
+      }
+    } catch (error) {
+      notify((error as Error).message, 'error');
+    }
+  };
+
+  const handleInstallUpdate = async () => {
+    try {
+      const result = await desktopApi.installUpdateNow();
+      if (!result.ok) {
+        notify('Henuz kurulmaya hazir bir guncelleme bulunmuyor.', 'info');
+      }
+    } catch (error) {
+      notify((error as Error).message, 'error');
+    }
+  };
 
   const handleOpenFolder = async () => {
     try {
@@ -52,7 +113,7 @@ const App = () => {
       setFolder(data);
       setSelectedFile(null);
       setStatus(AppStatus.LOADED);
-      notify(`"${data.name}" klasörü ve alt klasörleri tarandı.`, 'success');
+      notify(`"${data.name}" klasoru ve alt klasorleri tarandi.`, 'success');
     } catch (error) {
       setStatus(AppStatus.IDLE);
       const message = (error as Error).message;
@@ -66,7 +127,7 @@ const App = () => {
     try {
       const result = await desktopApi.copyFile(file);
       setTargetDirectory(result.targetDirectory);
-      notify(`${file.name} hedef klasöre kopyalandı.`, 'success');
+      notify(`${file.name} hedef klasore kopyalandi.`, 'success');
     } catch (error) {
       const message = (error as Error).message;
       if (!message.toLowerCase().includes('iptal')) {
@@ -87,7 +148,7 @@ const App = () => {
     try {
       const result = await desktopApi.changeTargetDirectory();
       setTargetDirectory(result.targetDirectory);
-      notify('Hedef klasör güncellendi.', 'success');
+      notify('Hedef klasor guncellendi.', 'success');
     } catch (error) {
       const message = (error as Error).message;
       if (!message.toLowerCase().includes('iptal')) {
@@ -167,10 +228,10 @@ const App = () => {
         {
           label:
             sortBy === 'name'
-              ? 'İsme göre sıralandı'
+              ? 'Isme gore siralandi'
               : sortBy === 'size'
-                ? 'Boyuta göre sıralandı'
-                : 'Tarihe göre sıralandı',
+                ? 'Boyuta gore siralandi'
+                : 'Tarihe gore siralandi',
           files: filteredFiles
         }
       ];
@@ -204,10 +265,17 @@ const App = () => {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div>
-          <p className="eyebrow">Windows Desktop</p>
-          <h1>PixelLocalLens</h1>
-          <p className="muted">Yerel klasörlerdeki görselleri çözünürlüğe göre keşfet, filtrele ve kopyala.</p>
+        <div className="brand-lockup">
+          <img className="brand-lockup__icon" src={appIconUrl} alt="PixelLocalLens ikonu" />
+          <div>
+            <p className="eyebrow">Windows Desktop</p>
+            <h1>PixelLocalLens</h1>
+            <p className="muted">Yerel klasorlerdeki gorselleri cozunurluge gore kesfet, filtrele ve kopyala.</p>
+            <div className="status-strip">
+              {appVersion && <span className="status-chip">v{appVersion}</span>}
+              {updateStatus?.message && <span className="status-text">{updateStatus.message}</span>}
+            </div>
+          </div>
         </div>
 
         <div className="topbar__actions">
@@ -219,11 +287,17 @@ const App = () => {
               onChange={(event) => setSearchQuery(event.target.value)}
             />
           )}
+          <button
+            className="secondary-button"
+            onClick={updateStatus?.status === 'downloaded' ? handleInstallUpdate : handleCheckForUpdates}
+          >
+            {updateStatus?.status === 'downloaded' ? 'Guncellemeyi kur' : 'Guncellemeleri kontrol et'}
+          </button>
           <button className="secondary-button" onClick={handleChangeTargetDirectory}>
-            Hedef klasör seç
+            Hedef klasor sec
           </button>
           <button className="primary-button" onClick={handleOpenFolder}>
-            {folder ? 'Yeni klasör tara' : 'Klasör tara'}
+            {folder ? 'Yeni klasor tara' : 'Klasor tara'}
           </button>
         </div>
       </header>
@@ -232,13 +306,10 @@ const App = () => {
         {status === AppStatus.IDLE && !folder && (
           <section className="hero">
             <p className="eyebrow">PixelLocalLens Desktop</p>
-            <h2>Görsellerinizi native Windows deneyimiyle tarayın.</h2>
-            <p>
-              Alt klasörler dahil tarama yapın, dosyaları çözünürlüğe göre gruplayın, büyük önizleme açın ve
-              seçilen dosyaları hedef klasöre kopyalayın.
-            </p>
+            <h2>Gorsellerinizi native Windows deneyimiyle tarayin.</h2>
+            <p>Alt klasorler dahil tarama yapin, dosyalari cozunurluge gore gruplayin, buyuk onizleme acin ve secilen dosyalari hedef klasore kopyalayin.</p>
             <button className="primary-button primary-button--large" onClick={handleOpenFolder}>
-              Taramayı başlat
+              Taramayi baslat
             </button>
           </section>
         )}
@@ -246,7 +317,7 @@ const App = () => {
         {status === AppStatus.LOADING && (
           <section className="hero hero--loading">
             <div className="spinner" />
-            <p>Dosyalar taranıyor...</p>
+            <p>Dosyalar taraniyor...</p>
           </section>
         )}
 
@@ -255,15 +326,15 @@ const App = () => {
             <section className="panel panel--filters">
               <div className="panel__heading">
                 <div>
-                  <p className="eyebrow">Klasör</p>
+                  <p className="eyebrow">Klasor</p>
                   <h2>{folder.name}</h2>
                   <p className="muted">{folder.rootPath}</p>
                 </div>
 
                 <div>
-                  <p className="eyebrow">Hedef Klasör</p>
+                  <p className="eyebrow">Hedef Klasor</p>
                   <h2>{getFolderLabel(targetDirectory)}</h2>
-                  <p className="muted">{targetDirectory ?? 'Kopyalama sırasında seçtiğiniz klasör burada görünecek.'}</p>
+                  <p className="muted">{targetDirectory ?? 'Kopyalama sirasinda sectiginiz klasor burada gorunecek.'}</p>
                 </div>
 
                 <div className="stats-grid">
@@ -272,7 +343,7 @@ const App = () => {
                     <strong>{stats.total}</strong>
                   </div>
                   <div className="stat-card">
-                    <span>Görsel</span>
+                    <span>Gorsel</span>
                     <strong>{stats.images}</strong>
                   </div>
                 </div>
@@ -280,17 +351,17 @@ const App = () => {
 
               <div className="filters-grid">
                 <label>
-                  <span>Sıralama</span>
+                  <span>Siralama</span>
                   <select value={sortBy} onChange={(event) => setSortBy(event.target.value as SortOption)}>
-                    <option value="resolution">Çözünürlüğe göre</option>
-                    <option value="name">İsme göre</option>
-                    <option value="size">Boyuta göre</option>
-                    <option value="modified">Tarihe göre</option>
+                    <option value="resolution">Cozunurluge gore</option>
+                    <option value="name">Isme gore</option>
+                    <option value="size">Boyuta gore</option>
+                    <option value="modified">Tarihe gore</option>
                   </select>
                 </label>
 
                 <label>
-                  <span>Yönelim</span>
+                  <span>Yonelim</span>
                   <select value={orientationFilter} onChange={(event) => setOrientationFilter(event.target.value as OrientationFilter)}>
                     <option value="all">Hepsi</option>
                     <option value="landscape">Yatay</option>
@@ -303,8 +374,8 @@ const App = () => {
 
             {filteredFiles.length === 0 && (
               <section className="empty-state">
-                <h3>Sonuç bulunamadı</h3>
-                <p>Arama veya filtreleri değiştirerek listeyi yeniden daraltabilirsiniz.</p>
+                <h3>Sonuc bulunamadi</h3>
+                <p>Arama veya filtreleri degistirerek listeyi yeniden daraltabilirsiniz.</p>
               </section>
             )}
 

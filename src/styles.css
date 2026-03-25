@@ -57,6 +57,45 @@ button {
   margin: 0;
 }
 
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.brand-lockup__icon {
+  width: 64px;
+  height: 64px;
+  flex: 0 0 auto;
+  border-radius: 18px;
+  box-shadow: 0 16px 32px rgba(23, 32, 51, 0.18);
+}
+
+.status-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #e9eeff;
+  color: #33419a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.status-text {
+  color: #4f5b7f;
+  font-size: 14px;
+}
+
 .muted {
   color: #5f6880;
   margin: 8px 0 0;
@@ -503,6 +542,10 @@ button {
 @media (max-width: 1024px) {
   .app-shell {
     padding: 18px;
+  }
+
+  .brand-lockup {
+    align-items: flex-start;
   }
 
   .topbar,

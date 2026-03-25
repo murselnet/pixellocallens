@@ -3,10 +3,17 @@ const path = require('node:path');
 const fs = require('node:fs/promises');
 const { pathToFileURL } = require('node:url');
 const Store = require('electron-store').default;
+const { autoUpdater } = require('electron-updater');
 const { imageSize } = require('image-size');
 
 const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif']);
 const defaultTargetDirectory = app.getPath('desktop');
+const windowIconPath = path.join(__dirname, '..', 'build', 'icon.png');
+const isDevelopment = !app.isPackaged;
+let mainWindow = null;
+let updateDownloaded = false;
+let updateCheckInFlight = false;
+let lastUpdateCheckSource = 'background';
 
 const store = new Store({
   name: 'pixellocallens-desktop',
@@ -27,13 +34,14 @@ function getStoredTargetDirectory() {
 }
 
 function createWindow() {
-  const window = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1480,
     height: 960,
     minWidth: 1120,
     minHeight: 760,
     backgroundColor: '#eef2ff',
     autoHideMenuBar: true,
+    icon: windowIconPath,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -43,12 +51,157 @@ function createWindow() {
 
   const devServerUrl = process.env.VITE_DEV_SERVER_URL;
   if (devServerUrl) {
-    window.loadURL(devServerUrl);
-    window.webContents.openDevTools({ mode: 'detach' });
+    mainWindow.loadURL(devServerUrl);
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
     return;
   }
 
-  window.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+  mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+}
+
+function sendUpdateStatus(payload) {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  mainWindow.webContents.send('app:update-status', payload);
+}
+
+function setUpdateCheckState(isInFlight) {
+  updateCheckInFlight = isInFlight;
+}
+
+async function promptForUpdateInstall(version) {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  const result = await dialog.showMessageBox(mainWindow, {
+    type: 'info',
+    buttons: ['Simdi yeniden baslat', 'Daha sonra'],
+    defaultId: 0,
+    cancelId: 1,
+    title: 'Guncelleme hazir',
+    message: `PixelLocalLens ${version} indirildi.`,
+    detail: 'Guncellemeyi kurmak icin uygulamayi simdi yeniden baslatabilirsiniz.'
+  });
+
+  if (result.response === 0) {
+    autoUpdater.quitAndInstall();
+  }
+}
+
+function configureAutoUpdater() {
+  if (isDevelopment) {
+    return;
+  }
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('checking-for-update', () => {
+    sendUpdateStatus({
+      status: 'checking',
+      message: 'Guncellemeler kontrol ediliyor.',
+      source: lastUpdateCheckSource
+    });
+  });
+
+  autoUpdater.on('update-available', (info) => {
+    setUpdateCheckState(false);
+    sendUpdateStatus({
+      status: 'available',
+      message: `Yeni surum bulundu: v${info.version}. Indiriliyor...`,
+      version: info.version,
+      source: lastUpdateCheckSource
+    });
+  });
+
+  autoUpdater.on('update-not-available', (info) => {
+    setUpdateCheckState(false);
+    sendUpdateStatus({
+      status: 'not-available',
+      message: `Uygulama guncel. Surum: v${info.version}.`,
+      version: info.version,
+      source: lastUpdateCheckSource
+    });
+  });
+
+  autoUpdater.on('download-progress', (progress) => {
+    sendUpdateStatus({
+      status: 'downloading',
+      message: `Guncelleme indiriliyor... %${Math.round(progress.percent)}`,
+      progress: progress.percent,
+      source: lastUpdateCheckSource
+    });
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    setUpdateCheckState(false);
+    updateDownloaded = true;
+    sendUpdateStatus({
+      status: 'downloaded',
+      message: `v${info.version} indirildi. Uygulamayi yeniden baslatarak kurulumu tamamlayabilirsiniz.`,
+      version: info.version,
+      source: lastUpdateCheckSource
+    });
+    void promptForUpdateInstall(info.version);
+  });
+
+  autoUpdater.on('error', (error) => {
+    setUpdateCheckState(false);
+    sendUpdateStatus({
+      status: 'error',
+      message: error?.message || 'Guncelleme sirasinda beklenmeyen bir hata olustu.',
+      source: lastUpdateCheckSource
+    });
+  });
+}
+
+async function checkForUpdates(source = 'manual') {
+  if (isDevelopment) {
+    sendUpdateStatus({
+      status: 'dev-mode',
+      message: 'Guncelleme denetimi gelistirme modunda kapali.',
+      source
+    });
+    return { started: false, reason: 'dev-mode' };
+  }
+
+  if (updateCheckInFlight) {
+    return { started: false, reason: 'busy' };
+  }
+
+  setUpdateCheckState(true);
+  updateDownloaded = false;
+  lastUpdateCheckSource = source;
+  sendUpdateStatus({
+    status: 'checking',
+    message: 'Guncellemeler kontrol ediliyor.',
+    source
+  });
+
+  try {
+    await autoUpdater.checkForUpdates();
+    return { started: true };
+  } catch (error) {
+    setUpdateCheckState(false);
+    sendUpdateStatus({
+      status: 'error',
+      message: error?.message || 'Guncelleme kontrolu basarisiz oldu.',
+      source
+    });
+    throw error;
+  }
+}
+
+async function installUpdateNow() {
+  if (!updateDownloaded) {
+    return { ok: false };
+  }
+
+  autoUpdater.quitAndInstall();
+  return { ok: true };
 }
 
 async function scanDirectoryRecursive(rootDirectory, currentDirectory = rootDirectory) {
@@ -203,8 +356,28 @@ ipcMain.handle('media:get-preview-data-url', async (_event, payload) => {
   return { dataUrl: resized.toDataURL() };
 });
 
+ipcMain.handle('app:get-version', async () => {
+  return { version: app.getVersion() };
+});
+
+ipcMain.handle('app:check-for-updates', async () => {
+  return checkForUpdates('manual');
+});
+
+ipcMain.handle('app:install-update-now', async () => {
+  return installUpdateNow();
+});
+
 app.whenReady().then(() => {
+  app.setAppUserModelId('com.projehub.pixellocallens.desktop');
+  configureAutoUpdater();
   createWindow();
+
+  if (!isDevelopment) {
+    setTimeout(() => {
+      void checkForUpdates('background').catch(() => {});
+    }, 5000);
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -217,4 +390,8 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('browser-window-created', (_event, window) => {
+  mainWindow = window;
 });

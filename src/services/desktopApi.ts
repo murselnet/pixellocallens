@@ -1,4 +1,4 @@
-import { FileMetadata, FolderData } from '../types';
+import { FileMetadata, FolderData, UpdateStatusPayload } from '../types';
 
 declare global {
   interface Window {
@@ -9,6 +9,10 @@ declare global {
       getTargetDirectory: () => Promise<{ targetDirectory: string | null }>;
       openInExplorer: (file: { fullPath: string }) => Promise<{ ok: true }>;
       getPreviewDataUrl: (file: { fullPath: string; maxSize?: number }) => Promise<{ dataUrl: string }>;
+      getAppVersion: () => Promise<{ version: string }>;
+      checkForUpdates: () => Promise<{ started: boolean; reason?: string }>;
+      installUpdateNow: () => Promise<{ ok: boolean }>;
+      onUpdateStatus: (callback: (payload: UpdateStatusPayload) => void) => () => void;
     };
   }
 }
@@ -31,6 +35,18 @@ export const desktopApi = {
   },
   getPreviewDataUrl(fullPath: string, maxSize?: number): Promise<{ dataUrl: string }> {
     return window.desktopApi.getPreviewDataUrl({ fullPath, maxSize });
+  },
+  getAppVersion(): Promise<{ version: string }> {
+    return window.desktopApi.getAppVersion();
+  },
+  checkForUpdates(): Promise<{ started: boolean; reason?: string }> {
+    return window.desktopApi.checkForUpdates();
+  },
+  installUpdateNow(): Promise<{ ok: boolean }> {
+    return window.desktopApi.installUpdateNow();
+  },
+  onUpdateStatus(callback: (payload: UpdateStatusPayload) => void): () => void {
+    return window.desktopApi.onUpdateStatus(callback);
   },
   isAvailable(): boolean {
     return typeof window.desktopApi !== 'undefined';

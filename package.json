@@ -1,6 +1,8 @@
 {
   "name": "pixellocallens-desktop",
   "version": "0.1.0",
+  "description": "PixelLocalLens masaustu uygulamasi ile klasorlerdeki gorselleri tarayin, onizleyin ve hizlica hedef klasore kopyalayin.",
+  "author": "Projehub",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
@@ -10,10 +12,12 @@
     "dev:electron": "wait-on tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .",
     "build": "tsc -p tsconfig.json && vite build",
     "dist": "npm run build && electron-builder",
+    "publish:github": "npm run build && electron-builder --publish always",
     "preview": "vite preview"
   },
   "dependencies": {
     "electron-store": "^10.1.0",
+    "electron-updater": "^6.8.3",
     "image-size": "^2.0.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
@@ -27,6 +31,7 @@
     "cross-env": "^10.0.0",
     "electron": "^37.2.0",
     "electron-builder": "^26.0.12",
+    "png-to-ico": "^3.0.1",
     "typescript": "~5.6.2",
     "vite": "^7.1.3",
     "wait-on": "^8.0.4"
@@ -39,13 +44,41 @@
     },
     "files": [
       "dist/**/*",
+      "build/icon.png",
       "electron/**/*",
       "package.json"
     ],
     "win": {
+      "icon": "build/icon.ico",
       "target": [
         "nsis"
       ]
-    }
-  }
+    },
+    "nsis": {
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "shortcutName": "PixelLocalLens Desktop"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "murselnet",
+        "repo": "pixellocallens",
+        "releaseType": "draft"
+      }
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/murselnet/pixellocallens.git"
+  },
+  "license": "UNLICENSED",
+  "keywords": [
+    "electron",
+    "desktop",
+    "image-browser",
+    "windows"
+  ],
+  "homepage": "https://github.com/murselnet/pixellocallens"
 }
