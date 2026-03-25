@@ -8,6 +8,8 @@ export interface FileMetadata {
   previewUrl: string;
   width?: number;
   height?: number;
+  duplicateGroupKey?: string;
+  duplicateCount?: number;
 }
 
 export interface FolderData {
@@ -38,3 +40,11 @@ export enum AppStatus {
 
 export type SortOption = 'resolution' | 'name' | 'size' | 'modified';
 export type OrientationFilter = 'all' | 'landscape' | 'portrait' | 'square';
+export type DuplicateFilter = 'all' | 'duplicates' | 'unique';
+export type CopyGroupingRule = 'none' | 'resolution' | 'extension' | 'date';
+export type CopyConflictRule = 'rename' | 'overwrite' | 'skip';
+
+export interface CopyRules {
+  grouping: CopyGroupingRule;
+  conflict: CopyConflictRule;
+}

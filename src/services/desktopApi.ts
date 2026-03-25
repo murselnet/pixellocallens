@@ -1,10 +1,18 @@
-import { FileMetadata, FolderData, UpdateStatusPayload } from '../types';
+import { CopyRules, FileMetadata, FolderData, UpdateStatusPayload } from '../types';
 
 declare global {
   interface Window {
     desktopApi: {
       openFolder: () => Promise<FolderData>;
-      copyFile: (file: { fullPath: string; fileName: string }) => Promise<{ destinationPath: string; targetDirectory: string }>;
+      copyFile: (file: {
+        fullPath: string;
+        fileName: string;
+        width?: number;
+        height?: number;
+        extension: string;
+        lastModified: number;
+        rules: CopyRules;
+      }) => Promise<{ destinationPath: string; targetDirectory: string; skipped?: boolean }>;
       changeTargetDirectory: () => Promise<{ targetDirectory: string }>;
       getTargetDirectory: () => Promise<{ targetDirectory: string | null }>;
       openInExplorer: (file: { fullPath: string }) => Promise<{ ok: true }>;
@@ -22,8 +30,16 @@ export const desktopApi = {
   openFolder(): Promise<FolderData> {
     return window.desktopApi.openFolder();
   },
-  copyFile(file: FileMetadata): Promise<{ destinationPath: string; targetDirectory: string }> {
-    return window.desktopApi.copyFile({ fullPath: file.fullPath, fileName: file.name });
+  copyFile(file: FileMetadata, rules: CopyRules): Promise<{ destinationPath: string; targetDirectory: string; skipped?: boolean }> {
+    return window.desktopApi.copyFile({
+      fullPath: file.fullPath,
+      fileName: file.name,
+      width: file.width,
+      height: file.height,
+      extension: file.extension,
+      lastModified: file.lastModified,
+      rules
+    });
   },
   changeTargetDirectory(): Promise<{ targetDirectory: string }> {
     return window.desktopApi.changeTargetDirectory();

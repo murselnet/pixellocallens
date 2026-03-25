@@ -5,6 +5,10 @@ import PreviewModal from './components/PreviewModal';
 import { desktopApi } from './services/desktopApi';
 import {
   AppStatus,
+  CopyConflictRule,
+  CopyGroupingRule,
+  CopyRules,
+  DuplicateFilter,
   FileMetadata,
   FolderData,
   Notification as NotificationType,
@@ -19,6 +23,7 @@ const fileNameCollator = new Intl.Collator('tr', {
 });
 
 const appIconUrl = new URL('./app-icon.png', window.location.href).toString();
+const defaultCopyRules: CopyRules = { grouping: 'none', conflict: 'rename' };
 
 const getFolderLabel = (fullPath: string | null) => {
   if (!fullPath) {
@@ -35,6 +40,8 @@ const App = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('resolution');
   const [orientationFilter, setOrientationFilter] = useState<OrientationFilter>('all');
+  const [duplicateFilter, setDuplicateFilter] = useState<DuplicateFilter>('all');
+  const [copyRules, setCopyRules] = useState<CopyRules>(defaultCopyRules);
   const [selectedFile, setSelectedFile] = useState<FileMetadata | null>(null);
   const [notifications, setNotifications] = useState<NotificationType[]>([]);
   const [appVersion, setAppVersion] = useState('');
@@ -140,8 +147,13 @@ const App = () => {
 
   const handleCopyFile = async (file: FileMetadata) => {
     try {
-      const result = await desktopApi.copyFile(file);
+      const result = await desktopApi.copyFile(file, copyRules);
       setTargetDirectory(result.targetDirectory);
+      if (result.skipped) {
+        notify(`${file.name} ayni isimli dosya oldugu icin kopyalanmadi.`, 'info');
+        return;
+      }
+
       notify(`${file.name} hedef klasore kopyalandi.`, 'success');
     } catch (error) {
       const message = (error as Error).message;
@@ -213,16 +225,25 @@ const App = () => {
         }
         return file.width === file.height;
       })
+      .filter((file) => {
+        if (duplicateFilter === 'all') {
+          return true;
+        }
+
+        const isDuplicate = (file.duplicateCount ?? 1) > 1;
+        return duplicateFilter === 'duplicates' ? isDuplicate : !isDuplicate;
+      })
       .slice()
       .sort(compareFiles);
-  }, [deferredSearch, folder, orientationFilter, sortBy]);
+  }, [deferredSearch, duplicateFilter, folder, orientationFilter, sortBy]);
 
   const stats = useMemo(
     () => ({
       total: filteredFiles.length,
-      images: filteredFiles.length
+      images: filteredFiles.length,
+      duplicates: filteredFiles.filter((file) => (file.duplicateCount ?? 1) > 1).length
     }),
-    [filteredFiles.length]
+    [filteredFiles]
   );
 
   const maxDimensions = useMemo(
@@ -238,6 +259,27 @@ const App = () => {
   );
 
   const displayGroups = useMemo(() => {
+    if (duplicateFilter === 'duplicates') {
+      const duplicateGroups = new Map<string, FileMetadata[]>();
+
+      filteredFiles.forEach((file) => {
+        if (!file.duplicateGroupKey) {
+          return;
+        }
+
+        const existing = duplicateGroups.get(file.duplicateGroupKey) ?? [];
+        existing.push(file);
+        duplicateGroups.set(file.duplicateGroupKey, existing);
+      });
+
+      return [...duplicateGroups.values()]
+        .sort((left, right) => right.length - left.length || compareFiles(left[0], right[0]))
+        .map((files, index) => ({
+          label: `Yinelenen Grup ${index + 1}`,
+          files
+        }));
+    }
+
     if (sortBy !== 'resolution') {
       return [
         {
@@ -275,7 +317,27 @@ const App = () => {
         return rightWidth * rightHeight - leftWidth * leftHeight;
       })
       .map(([resolution, files]) => ({ label: resolution, files }));
-  }, [filteredFiles, sortBy]);
+  }, [compareFiles, duplicateFilter, filteredFiles, sortBy]);
+
+  const copyRulesDescription = useMemo(() => {
+    const groupingLabel =
+      copyRules.grouping === 'resolution'
+        ? 'çözünürlüğe göre alt klasör oluştur'
+        : copyRules.grouping === 'extension'
+          ? 'uzantıya göre alt klasör oluştur'
+          : copyRules.grouping === 'date'
+            ? 'tarihe göre alt klasör oluştur'
+            : 'doğrudan hedef klasöre kopyala';
+
+    const conflictLabel =
+      copyRules.conflict === 'overwrite'
+        ? 'aynı isim varsa üzerine yaz'
+        : copyRules.conflict === 'skip'
+          ? 'aynı isim varsa atla'
+          : 'aynı isim varsa yeni ad üret';
+
+    return `${groupingLabel}, ${conflictLabel}.`;
+  }, [copyRules.conflict, copyRules.grouping]);
 
   const isUpdateBusy = updateStatus?.status === 'checking' || updateStatus?.status === 'downloading';
   const canDownloadAndInstall = updateStatus?.status === 'available';
@@ -383,6 +445,10 @@ const App = () => {
                     <span>Gorsel</span>
                     <strong>{stats.images}</strong>
                   </div>
+                  <div className="stat-card">
+                    <span>Yinelenen</span>
+                    <strong>{stats.duplicates}</strong>
+                  </div>
                 </div>
               </div>
 
@@ -406,6 +472,51 @@ const App = () => {
                     <option value="square">Kare</option>
                   </select>
                 </label>
+
+                <label>
+                  <span>Yinelenenler</span>
+                  <select value={duplicateFilter} onChange={(event) => setDuplicateFilter(event.target.value as DuplicateFilter)}>
+                    <option value="all">Hepsi</option>
+                    <option value="duplicates">Sadece yinelenenler</option>
+                    <option value="unique">Sadece tekil dosyalar</option>
+                  </select>
+                </label>
+              </div>
+
+              <div className="filters-grid filters-grid--copy-rules">
+                <label>
+                  <span>Kopyalama duzeni</span>
+                  <select
+                    value={copyRules.grouping}
+                    onChange={(event) =>
+                      setCopyRules((current) => ({ ...current, grouping: event.target.value as CopyGroupingRule }))
+                    }
+                  >
+                    <option value="none">Ek klasor olusturma</option>
+                    <option value="resolution">Cozunurluge gore klasorle</option>
+                    <option value="extension">Uzantiya gore klasorle</option>
+                    <option value="date">Tarihe gore klasorle</option>
+                  </select>
+                </label>
+
+                <label>
+                  <span>Ad cakismasi</span>
+                  <select
+                    value={copyRules.conflict}
+                    onChange={(event) =>
+                      setCopyRules((current) => ({ ...current, conflict: event.target.value as CopyConflictRule }))
+                    }
+                  >
+                    <option value="rename">Yeni ad olustur</option>
+                    <option value="overwrite">Uzerine yaz</option>
+                    <option value="skip">Atla</option>
+                  </select>
+                </label>
+
+                <div className="rule-summary-card">
+                  <span>Kopyalama kurali</span>
+                  <strong>{copyRulesDescription}</strong>
+                </div>
               </div>
             </section>
 

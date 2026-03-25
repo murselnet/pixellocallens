@@ -132,7 +132,7 @@ button {
 
 .topbar__buttons {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, max-content));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   justify-content: end;
   width: 100%;
@@ -190,6 +190,11 @@ button {
   border-radius: 14px;
   border: 1px solid #d5dcf7;
   white-space: nowrap;
+}
+
+.topbar__buttons > button {
+  width: 100%;
+  min-width: 0;
 }
 
 .secondary-button:disabled {
@@ -272,7 +277,8 @@ button {
 }
 
 .stat-card,
-.detail-card {
+.detail-card,
+.rule-summary-card {
   border-radius: 18px;
   background: #f3f6ff;
   padding: 16px;
@@ -280,6 +286,7 @@ button {
 
 .stat-card span,
 .detail-card span,
+.rule-summary-card span,
 .filters-grid label span,
 .file-card__meta span {
   display: block;
@@ -290,10 +297,17 @@ button {
 }
 
 .stat-card strong,
-.detail-card strong {
+.detail-card strong,
+.rule-summary-card strong {
   display: block;
   margin-top: 8px;
   font-size: 24px;
+}
+
+.rule-summary-card strong {
+  font-size: 16px;
+  line-height: 1.5;
+  color: #253056;
 }
 
 .filters-grid {
@@ -307,6 +321,11 @@ button {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.filters-grid--copy-rules {
+  margin-top: 16px;
+  align-items: stretch;
 }
 
 .empty-state {
@@ -418,6 +437,13 @@ button {
 .file-card__resolution {
   margin: 8px 0 0;
   color: #5563d1;
+  font-weight: 700;
+}
+
+.file-card__duplicate {
+  margin: 8px 0 0;
+  color: #0f766e;
+  font-size: 14px;
   font-weight: 700;
 }
 
@@ -615,6 +641,16 @@ button {
     justify-items: stretch;
   }
 
+  .topbar__buttons {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .topbar__buttons > button:first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 1240px) {
   .topbar__buttons {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

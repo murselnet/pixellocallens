@@ -50,6 +50,7 @@ const FileCard = ({ file, maxDimensions, onPreview, onCopy, onReveal }: Props) =
         <div>
           <h3 title={file.name}>{file.name}</h3>
           <p className="file-card__resolution">{file.width && file.height ? `${file.width} x ${file.height}` : 'Bilinmiyor'}</p>
+          {file.duplicateCount && file.duplicateCount > 1 && <p className="file-card__duplicate">Yinelenen grup: {file.duplicateCount} dosya</p>}
         </div>
 
         <div className="file-card__meta">

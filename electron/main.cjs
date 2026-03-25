@@ -1,4 +1,5 @@
 const { app, BrowserWindow, dialog, ipcMain, shell, nativeImage } = require('electron');
+const crypto = require('node:crypto');
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const { pathToFileURL } = require('node:url');
@@ -336,9 +337,11 @@ async function scanDirectoryRecursive(rootDirectory, currentDirectory = rootDire
     try {
       const imageBuffer = await fs.readFile(fullPath);
       const dimensions = imageSize(imageBuffer);
+      metadata.duplicateGroupKey = crypto.createHash('sha1').update(imageBuffer).digest('hex');
       metadata.width = dimensions.width;
       metadata.height = dimensions.height;
     } catch (_error) {
+      metadata.duplicateGroupKey = undefined;
       metadata.width = undefined;
       metadata.height = undefined;
     }
@@ -349,10 +352,87 @@ async function scanDirectoryRecursive(rootDirectory, currentDirectory = rootDire
   return files;
 }
 
+function applyDuplicateMetadata(files) {
+  const duplicateGroups = new Map();
+
+  files.forEach((file) => {
+    if (!file.duplicateGroupKey) {
+      file.duplicateCount = 1;
+      return;
+    }
+
+    const existing = duplicateGroups.get(file.duplicateGroupKey) ?? [];
+    existing.push(file);
+    duplicateGroups.set(file.duplicateGroupKey, existing);
+  });
+
+  files.forEach((file) => {
+    if (!file.duplicateGroupKey) {
+      return;
+    }
+
+    const count = duplicateGroups.get(file.duplicateGroupKey)?.length ?? 1;
+    file.duplicateCount = count;
+
+    if (count < 2) {
+      file.duplicateGroupKey = undefined;
+    }
+  });
+}
+
+function getGroupingDirectoryName(file, groupingRule) {
+  switch (groupingRule) {
+    case 'resolution':
+      return file.width && file.height ? `${file.width}x${file.height}` : 'Bilinmiyor';
+    case 'extension':
+      return file.extension || 'Bilinmiyor';
+    case 'date': {
+      const stamp = new Date(file.lastModified);
+      const year = stamp.getFullYear();
+      const month = String(stamp.getMonth() + 1).padStart(2, '0');
+      return `${year}-${month}`;
+    }
+    case 'none':
+    default:
+      return '';
+  }
+}
+
+async function pathExists(targetPath) {
+  try {
+    await fs.access(targetPath);
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+async function resolveCopyDestination(baseDirectory, fileName, conflictRule) {
+  const parsedFile = path.parse(fileName);
+  let candidatePath = path.join(baseDirectory, fileName);
+
+  if (conflictRule === 'overwrite' || !(await pathExists(candidatePath))) {
+    return candidatePath;
+  }
+
+  if (conflictRule === 'skip') {
+    return null;
+  }
+
+  let attempt = 2;
+  while (await pathExists(candidatePath)) {
+    const nextName = `${parsedFile.name} (${attempt})${parsedFile.ext}`;
+    candidatePath = path.join(baseDirectory, nextName);
+    attempt += 1;
+  }
+
+  return candidatePath;
+}
+
 async function openFolderDialog() {
   const window = BrowserWindow.getFocusedWindow();
   const result = await dialog.showOpenDialog(window, {
-    title: 'Taranacak klasörü seçin',
+    title: 'Taranacak klasÃ¶rÃ¼ seÃ§in',
     defaultPath: getDefaultDesktopDirectory(),
     properties: ['openDirectory']
   });
@@ -364,6 +444,7 @@ async function openFolderDialog() {
   const selectedDirectory = result.filePaths[0];
   const files = await scanDirectoryRecursive(selectedDirectory);
 
+  applyDuplicateMetadata(files);
   files.sort((left, right) => left.name.localeCompare(right.name, 'tr'));
 
   return {
@@ -376,7 +457,7 @@ async function openFolderDialog() {
 async function requestTargetDirectory() {
   const window = BrowserWindow.getFocusedWindow();
   const result = await dialog.showOpenDialog(window, {
-    title: 'Kaydedilecek hedef klasörü seçin',
+    title: 'Kaydedilecek hedef klasÃ¶rÃ¼ seÃ§in',
     defaultPath: getDefaultDesktopDirectory(),
     properties: ['openDirectory']
   });
@@ -395,18 +476,42 @@ ipcMain.handle('media:open-folder', async () => openFolderDialog());
 ipcMain.handle('media:copy-file', async (_event, payload) => {
   const sourcePath = payload?.fullPath;
   const fileName = payload?.fileName;
+  const rules = payload?.rules ?? { grouping: 'none', conflict: 'rename' };
 
   if (!sourcePath || !fileName) {
     throw new Error('Kopyalanacak dosya bilgisi eksik.');
   }
 
+  const sourceStats = await fs.stat(sourcePath);
   const targetDirectory = await getStoredTargetDirectory();
-  const destinationPath = path.join(targetDirectory, fileName);
+  const baseDirectoryName = getGroupingDirectoryName(
+    {
+      ...payload,
+      fileName,
+      extension: path.extname(fileName).replace('.', '').toUpperCase(),
+      lastModified: sourceStats.mtimeMs
+    },
+    rules.grouping
+  );
+  const destinationDirectory = baseDirectoryName ? path.join(targetDirectory, baseDirectoryName) : targetDirectory;
+
+  await fs.mkdir(destinationDirectory, { recursive: true });
+
+  const destinationPath = await resolveCopyDestination(destinationDirectory, fileName, rules.conflict);
+  if (!destinationPath) {
+    return {
+      destinationPath: path.join(destinationDirectory, fileName),
+      targetDirectory,
+      skipped: true
+    };
+  }
+
   await fs.copyFile(sourcePath, destinationPath);
 
   return {
     destinationPath,
-    targetDirectory
+    targetDirectory,
+    skipped: false
   };
 });
 
