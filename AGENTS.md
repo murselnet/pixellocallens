@@ -1,1 +1,0 @@
-Kullanacağın yazılım paketlerinin güncel ve stabil versiyonlarını kullan ve bunun için context7 MCP kullan.
