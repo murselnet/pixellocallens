@@ -10,7 +10,15 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+release
+*.exe
+*.msi
+*.nsis.7z
+*.blockmap
 *.local
+.env
+.env.*
+!.env.example
 
 # Editor directories and files
 .vscode/*
