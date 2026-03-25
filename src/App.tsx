@@ -107,6 +107,20 @@ const App = () => {
     }
   };
 
+  const handleDownloadAndInstallUpdate = async () => {
+    try {
+      const result = await desktopApi.downloadAndInstallUpdate();
+      if (!result.started && result.reason === 'busy') {
+        notify('Su anda zaten bir guncelleme kontrolu ya da indirme islemi suruyor.', 'info');
+      }
+      if (!result.started && result.reason === 'no-update') {
+        notify('Indirilecek hazir bir guncelleme bulunmuyor.', 'info');
+      }
+    } catch (error) {
+      notify((error as Error).message, 'error');
+    }
+  };
+
   const handleOpenFolder = async () => {
     try {
       setStatus(AppStatus.LOADING);
@@ -264,9 +278,12 @@ const App = () => {
   }, [filteredFiles, sortBy]);
 
   const isUpdateBusy = updateStatus?.status === 'checking' || updateStatus?.status === 'downloading';
+  const canDownloadAndInstall = updateStatus?.status === 'available';
   const updateButtonLabel =
     updateStatus?.status === 'downloaded'
       ? 'Guncellemeyi kur'
+      : canDownloadAndInstall
+        ? 'Indir ve kur'
       : isUpdateBusy
         ? 'Guncelleme suruyor'
         : 'Guncellemeleri kontrol et';
@@ -299,7 +316,13 @@ const App = () => {
           <button
             className="secondary-button"
             disabled={isUpdateBusy}
-            onClick={updateStatus?.status === 'downloaded' ? handleInstallUpdate : handleCheckForUpdates}
+            onClick={
+              updateStatus?.status === 'downloaded'
+                ? handleInstallUpdate
+                : canDownloadAndInstall
+                  ? handleDownloadAndInstallUpdate
+                  : handleCheckForUpdates
+            }
           >
             {updateButtonLabel}
           </button>
@@ -313,9 +336,6 @@ const App = () => {
       </header>
 
       <main className="layout">
-        <div className="helper-banner">
-          <strong>Akilli guncelleme hazir.</strong> Guncellemeler acilista otomatik kontrol edilir. Isterseniz yukaridaki butondan manuel denetim de baslatabilirsiniz.
-        </div>
         {status === AppStatus.IDLE && !folder && (
           <section className="hero">
             <p className="eyebrow">PixelLocalLens Desktop</p>

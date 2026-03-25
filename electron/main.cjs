@@ -16,6 +16,8 @@ let updateCheckInFlight = false;
 let lastUpdateCheckSource = 'background';
 let lastUpdateStatusSignature = '';
 let lastUpdateStatusAt = 0;
+let availableUpdateInfo = null;
+let updateInstallRequested = false;
 
 const store = new Store({
   name: 'pixellocallens-desktop',
@@ -61,6 +63,26 @@ function createWindow() {
   mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
 }
 
+function scheduleBackgroundUpdateCheck() {
+  if (isDevelopment || !mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  const triggerCheck = () => {
+    setTimeout(() => {
+      // Fire-and-forget so startup never waits on network/update work.
+      void checkForUpdates('background').catch(() => {});
+    }, 8000);
+  };
+
+  if (mainWindow.webContents.isLoading()) {
+    mainWindow.webContents.once('did-finish-load', triggerCheck);
+    return;
+  }
+
+  triggerCheck();
+}
+
 function sendUpdateStatus(payload) {
   if (!mainWindow || mainWindow.isDestroyed()) {
     return;
@@ -100,32 +122,12 @@ function setUpdateCheckState(isInFlight) {
   updateCheckInFlight = isInFlight;
 }
 
-async function promptForUpdateInstall(version) {
-  if (!mainWindow || mainWindow.isDestroyed()) {
-    return;
-  }
-
-  const result = await dialog.showMessageBox(mainWindow, {
-    type: 'info',
-    buttons: ['Simdi yeniden baslat', 'Daha sonra'],
-    defaultId: 0,
-    cancelId: 1,
-    title: 'Guncelleme hazir',
-    message: `PixelLocalLens ${version} indirildi.`,
-    detail: 'Guncellemeyi kurmak icin uygulamayi simdi yeniden baslatabilirsiniz.'
-  });
-
-  if (result.response === 0) {
-    autoUpdater.quitAndInstall();
-  }
-}
-
 function configureAutoUpdater() {
   if (isDevelopment) {
     return;
   }
 
-  autoUpdater.autoDownload = true;
+  autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
 
   autoUpdater.on('checking-for-update', () => {
@@ -138,9 +140,11 @@ function configureAutoUpdater() {
 
   autoUpdater.on('update-available', (info) => {
     setUpdateCheckState(false);
+    availableUpdateInfo = info;
+    updateDownloaded = false;
     sendUpdateStatus({
       status: 'available',
-      message: `Yeni surum bulundu: v${info.version}. Indiriliyor...`,
+      message: `Yeni surum bulundu: v${info.version}. Indirip kurmak icin butonu kullanin.`,
       version: info.version,
       source: lastUpdateCheckSource
     });
@@ -148,6 +152,8 @@ function configureAutoUpdater() {
 
   autoUpdater.on('update-not-available', (info) => {
     setUpdateCheckState(false);
+    availableUpdateInfo = null;
+    updateDownloaded = false;
     sendUpdateStatus({
       status: 'not-available',
       message: `Uygulama guncel. Surum: v${info.version}.`,
@@ -159,7 +165,7 @@ function configureAutoUpdater() {
   autoUpdater.on('download-progress', (progress) => {
     sendUpdateStatus({
       status: 'downloading',
-      message: `Guncelleme indiriliyor... %${Math.round(progress.percent)}`,
+      message: `Guncelleme indiriliyor... %${Math.round(progress.percent)}. Indirme tamamlaninca kurulum baslayacak.`,
       progress: progress.percent,
       source: lastUpdateCheckSource
     });
@@ -170,11 +176,18 @@ function configureAutoUpdater() {
     updateDownloaded = true;
     sendUpdateStatus({
       status: 'downloaded',
-      message: `v${info.version} indirildi. Uygulamayi yeniden baslatarak kurulumu tamamlayabilirsiniz.`,
+      message: updateInstallRequested
+        ? `v${info.version} indirildi. Kurulum baslatiliyor...`
+        : `v${info.version} indirildi. Guncellemeyi kurmak icin butonu kullanabilirsiniz.`,
       version: info.version,
       source: lastUpdateCheckSource
     });
-    void promptForUpdateInstall(info.version);
+
+    if (updateInstallRequested) {
+      setTimeout(() => {
+        autoUpdater.quitAndInstall();
+      }, 1200);
+    }
   });
 
   autoUpdater.on('error', (error) => {
@@ -199,6 +212,8 @@ async function checkForUpdates(source = 'manual') {
 
   setUpdateCheckState(true);
   updateDownloaded = false;
+  updateInstallRequested = false;
+  availableUpdateInfo = null;
   lastUpdateCheckSource = source;
   sendUpdateStatus({
     status: 'checking',
@@ -229,6 +244,46 @@ async function installUpdateNow() {
 
   autoUpdater.quitAndInstall();
   return { ok: true };
+}
+
+async function downloadAndInstallUpdate() {
+  if (isDevelopment) {
+    return { started: false, reason: 'dev-mode' };
+  }
+
+  if (updateCheckInFlight) {
+    return { started: false, reason: 'busy' };
+  }
+
+  if (updateDownloaded) {
+    updateInstallRequested = true;
+    autoUpdater.quitAndInstall();
+    return { started: true };
+  }
+
+  if (!availableUpdateInfo) {
+    return { started: false, reason: 'no-update' };
+  }
+
+  updateInstallRequested = true;
+  setUpdateCheckState(true);
+  sendUpdateStatus({
+    status: 'downloading',
+    message: `v${availableUpdateInfo.version} indiriliyor. Indirme tamamlaninca kurulum baslayacak.`,
+    version: availableUpdateInfo.version,
+    progress: 0,
+    source: 'manual'
+  });
+
+  try {
+    await autoUpdater.downloadUpdate();
+    return { started: true };
+  } catch (error) {
+    setUpdateCheckState(false);
+    updateInstallRequested = false;
+    sendUpdateStatus(mapUpdateErrorToStatus(error, 'manual'));
+    throw error;
+  }
 }
 
 async function scanDirectoryRecursive(rootDirectory, currentDirectory = rootDirectory) {
@@ -391,6 +446,10 @@ ipcMain.handle('app:check-for-updates', async () => {
   return checkForUpdates('manual');
 });
 
+ipcMain.handle('app:download-and-install-update', async () => {
+  return downloadAndInstallUpdate();
+});
+
 ipcMain.handle('app:install-update-now', async () => {
   return installUpdateNow();
 });
@@ -399,16 +458,12 @@ app.whenReady().then(() => {
   app.setAppUserModelId('com.projehub.pixellocallens.desktop');
   configureAutoUpdater();
   createWindow();
-
-  if (!isDevelopment) {
-    setTimeout(() => {
-      void checkForUpdates('background').catch(() => {});
-    }, 5000);
-  }
+  scheduleBackgroundUpdateCheck();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
+      scheduleBackgroundUpdateCheck();
     }
   });
 });

@@ -11,6 +11,7 @@ declare global {
       getPreviewDataUrl: (file: { fullPath: string; maxSize?: number }) => Promise<{ dataUrl: string }>;
       getAppVersion: () => Promise<{ version: string }>;
       checkForUpdates: () => Promise<{ started: boolean; reason?: string }>;
+      downloadAndInstallUpdate: () => Promise<{ started: boolean; reason?: string }>;
       installUpdateNow: () => Promise<{ ok: boolean }>;
       onUpdateStatus: (callback: (payload: UpdateStatusPayload) => void) => () => void;
     };
@@ -41,6 +42,9 @@ export const desktopApi = {
   },
   checkForUpdates(): Promise<{ started: boolean; reason?: string }> {
     return window.desktopApi.checkForUpdates();
+  },
+  downloadAndInstallUpdate(): Promise<{ started: boolean; reason?: string }> {
+    return window.desktopApi.downloadAndInstallUpdate();
   },
   installUpdateNow(): Promise<{ ok: boolean }> {
     return window.desktopApi.installUpdateNow();

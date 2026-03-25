@@ -182,20 +182,6 @@ button {
   margin-top: 26px;
 }
 
-.helper-banner {
-  margin-bottom: 18px;
-  padding: 14px 18px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.74);
-  border: 1px solid rgba(124, 136, 189, 0.16);
-  color: #516080;
-  box-shadow: 0 10px 28px rgba(50, 70, 120, 0.06);
-}
-
-.helper-banner strong {
-  color: #2c3f9c;
-}
-
 .hero,
 .panel,
 .empty-state {

@@ -1,37 +1,37 @@
 # PixelLocalLens Desktop
 
-PixelLocalLens Desktop, Windows üzerinde çalışan bir masaüstü uygulamasıdır. Yerel klasörlerdeki görselleri ve alt klasörleri tarar; dosyaları çözünürlük, boyut, tarih ve isim gibi kriterlere göre sıralamanızı sağlar. Amaç, çok sayıda görsel arasında hızlı seçim yapmak, büyük önizleme almak ve ihtiyaç duyulan dosyaları tek tıkla hedef klasöre kopyalamaktır.
+PixelLocalLens Desktop, Windows uzerinde calisan bir masaustu uygulamasidir. Yerel klasorlerdeki gorselleri ve alt klasorleri tarar; dosyalari cozunurluk, boyut, tarih ve isim gibi kriterlere gore siralamanizi saglar. Amac, cok sayida gorsel arasinda hizli secim yapmak, buyuk onizleme almak ve ihtiyac duyulan dosyalari tek tikla hedef klasore kopyalamaktir.
 
-Bu repo şu anda sadece masaüstü uygulamasını içerir.
+Bu repo su anda sadece masaustu uygulamasini icerir.
 
 ## Neler Sunar?
 
-- Alt klasörler dahil seçilen klasörü recursive olarak tarar.
-- `JPG`, `JPEG`, `PNG`, `WEBP` ve `GIF` dosyalarını listeler.
-- Görselleri çözünürlüğe göre gruplandırır.
-- İsim, dosya boyutu, değiştirilme tarihi ve çözünürlüğe göre sıralama sunar.
-- Yatay, dikey ve kare görseller için filtreleme yapar.
-- Dosya adına göre hızlı arama yapar.
-- Büyük görsel önizlemesi açar.
-- Dosyayı Windows Explorer içinde buldurabilir.
-- Seçilen görseli belirlenen hedef klasöre kopyalar.
-- Hedef klasör bilgisini yerel olarak saklar.
-- GitHub Releases tabanlı uygulama güncelleme akışını destekler.
+- Alt klasorler dahil secilen klasoru recursive olarak tarar.
+- `JPG`, `JPEG`, `PNG`, `WEBP` ve `GIF` dosyalarini listeler.
+- Gorselleri cozunurluge gore gruplandirir.
+- Isim, dosya boyutu, degistirilme tarihi ve cozunurluge gore siralama sunar.
+- Yatay, dikey ve kare gorseller icin filtreleme yapar.
+- Dosya adina gore hizli arama yapar.
+- Buyuk gorsel onizlemesi acar.
+- Dosyayi Windows Explorer icinde buldurabilir.
+- Secilen gorseli belirlenen hedef klasore kopyalar.
+- Hedef klasor bilgisini yerel olarak saklar.
+- GitHub Releases tabanli uygulama guncelleme akislarini destekler.
 
-## Kullanım Senaryosu
+## Kullanim Senaryosu
 
-PixelLocalLens özellikle şu tip ihtiyaçlar için uygundur:
+PixelLocalLens ozellikle su tip ihtiyaclar icin uygundur:
 
-- Büyük bir görsel arşivinde doğru dosyayı hızlı bulmak
-- Farklı çözünürlükteki görselleri ayıklamak
-- Tasarım, e-ticaret veya medya klasörlerinde seçim yapmak
-- Yerel dosyaları başka bir klasöre hızlıca toplamak
+- Buyuk bir gorsel arsivinde dogru dosyayi hizli bulmak
+- Farkli cozunurlukteki gorselleri ayiklamak
+- Tasarim, e-ticaret veya medya klasorlerinde secim yapmak
+- Yerel dosyalari baska bir klasore hizlica toplamak
 
-## Teknik Özet
+## Teknik Ozet
 
-Uygulama Electron tabanlı bir Windows desktop deneyimi sunar. Arayüz React ile geliştirilmiştir; renderer tarafı Vite ile çalışır. Dosya sistemi tarama, klasör seçimi, Explorer entegrasyonu ve otomatik güncelleme kontrolleri Electron main process tarafında yönetilir.
+Uygulama Electron tabanli bir Windows desktop deneyimi sunar. Arayuz React ile gelistirilmistir; renderer tarafi Vite ile calisir. Dosya sistemi tarama, klasor secimi, Explorer entegrasyonu ve otomatik guncelleme kontrolleri Electron main process tarafinda yonetilir.
 
-Kullanılan temel teknolojiler:
+Kullanilan temel teknolojiler:
 
 - Electron `37.2.0`
 - React `19.0.0`
@@ -42,25 +42,43 @@ Kullanılan temel teknolojiler:
 - electron-updater `6.8.3`
 - electron-store `10.1.0`
 
-## Proje Yapısı
+## Proje Yapisi
 
 ```text
 .
 |-- electron/       # Main process, preload ve native entegrasyonlar
-|-- src/            # React arayüzü
-|-- public/         # Statik varlıklar
-|-- build/          # Uygulama ikonları ve paketleme girdileri
-|-- dist/           # Web build çıktısı
-`-- release/        # Installer ve release artefact'ları
+|-- src/            # React arayuzu
+|-- public/         # Statik varliklar
+|-- build/          # Uygulama ikonlari ve paketleme girdileri
+|-- dist/           # Web build ciktisi
+`-- release/        # Local test paketleri ve release artefact'lari
 ```
 
-## Geliştirme Ortamı
+## Kullanici Kurulumu
+
+Uygulamayi kendi bilgisayarina kurmak isteyen bir kullanici icin en kolay yol GitHub Releases sayfasini kullanmaktir.
+
+Kurulum adimlari:
+
+1. GitHub repo sayfasindaki `Releases` bolumunu acin.
+2. En son surumu secin.
+3. `Assets` altindan `PixelLocalLens-Desktop-Setup-x.y.z.exe` dosyasini indirin.
+4. Indirilen `.exe` dosyasini calistirin.
+5. Kurulum tamamlandiktan sonra uygulamayi Windows Baslat menusunden acin.
+
+Notlar:
+
+- Son kullanicinin yalnizca `.exe` kurulum dosyasini indirmesi yeterlidir.
+- `latest.yml` ve `.blockmap` dosyalari otomatik guncelleme sistemi icindir; elle indirilmesine gerek yoktur.
+- Uygulama kurulduktan sonra yeni surumler GitHub Releases uzerinden otomatik olarak algilanabilir.
+
+## Gelistirme Ortami
 
 Gereksinimler:
 
-- Node.js 20+ önerilir
+- Node.js 20+ onerilir
 - npm 10+
-- Windows ortamında geliştirme önerilir
+- Windows ortaminda gelistirme onerilir
 
 Kurulum:
 
@@ -68,7 +86,7 @@ Kurulum:
 npm install
 ```
 
-Geliştirme modunda çalıştırma:
+Gelistirme modunda calistirma:
 
 ```bash
 npm run dev
@@ -76,59 +94,58 @@ npm run dev
 
 Bu komut:
 
-- Vite geliştirme sunucusunu başlatır
-- Electron uygulamasını geliştirme modunda açar
-- Arayüz ve desktop katmanını birlikte çalıştırır
+- Vite gelistirme sunucusunu baslatir
+- Electron uygulamasini gelistirme modunda acar
+- Arayuz ve desktop katmanini birlikte calistirir
 
 ## Build ve Paketleme
 
-Üretim build'i almak için:
+Uretim build'i almak icin:
 
 ```bash
 npm run build
 ```
 
-Windows installer oluşturmak için:
+Windows installer olusturmak icin:
 
 ```bash
 npm run dist
 ```
 
-Paketleme sonrası çıktılar varsayılan olarak `release/` klasörüne yazılır.
+Paketleme sonrasi ciktilar varsayilan olarak `release/` klasorune yazilir.
 
-## GitHub Release ve Güncelleme Akışı
+## GitHub Release ve Guncelleme Akisi
 
-Proje `electron-builder` ve `electron-updater` ile GitHub Releases üzerinden güncelleme dağıtımı için hazırlanmıştır.
+Proje `electron-builder` ve `electron-updater` ile GitHub Releases uzerinden guncelleme dagitimi icin hazirlanmistir.
 
-Yayın akışı:
+Yerel yayin akisi:
 
 ```bash
 npm run publish:github
 ```
 
-Bu komut:
+GitHub Actions tabanli yayin akisi:
 
-- production build oluşturur
-- Windows installer paketini üretir
-- GitHub üzerinde draft release oluşturur
-- gerekli release dosyalarını yükler
+- `main` branch'ine push yapildiginda workflow otomatik calisir
+- Windows release paketini GitHub runner uzerinde olusturur
+- GitHub Release'i otomatik olarak yayinlar
 
-Uygulama paketli modda çalıştığında:
+Uygulama paketli modda calistiginda:
 
-- arka planda güncelleme kontrolü yapabilir
-- yeni sürüm bulunduğunda indirme sürecini başlatır
-- indirme tamamlandığında kuruluma hazır hale gelir
+- arka planda guncelleme kontrolu yapabilir
+- yeni surum bulundugunda indirme surecini baslatir
+- indirme tamamlandiginda kuruluma hazir hale gelir
 
-## Desteklenen Özellikler
+## Desteklenen Ozellikler
 
-- Recursive klasör tarama
+- Recursive klasor tarama
 - Yerel dosya metadata okuma
-- Çözünürlük bazlı gruplama
-- Büyük önizleme penceresi
-- Kayıtlı hedef klasör tercihi
-- Explorer ile dosya konumunu açma
-- GitHub tabanlı auto-update
+- Cozunurluk bazli gruplama
+- Buyuk onizleme penceresi
+- Kayitli hedef klasor tercihi
+- Explorer ile dosya konumunu acma
+- GitHub tabanli auto-update
 
 ## Lisans
 
-Bu projenin `package.json` dosyasında lisans alanı şu anda `UNLICENSED` olarak tanımlıdır. Public repo olarak yayınlanmadan önce uygun lisansın açıkça eklenmesi önerilir.
+Bu projenin `package.json` dosyasinda lisans alani su anda `UNLICENSED` olarak tanimlidir. Public repo olarak yayinlanmadan once uygun lisansin acikca eklenmesi onerilir.
