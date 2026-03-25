@@ -1,6 +1,6 @@
 {
   "name": "pixellocallens-desktop",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "PixelLocalLens masaustu uygulamasi ile klasorlerdeki gorselleri tarayin, onizleyin ve hizlica hedef klasore kopyalayin.",
   "author": "Projehub",
   "private": true,
@@ -12,6 +12,7 @@
     "dev:electron": "wait-on tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .",
     "build": "tsc -p tsconfig.json && vite build",
     "dist": "npm run build && electron-builder",
+    "dist:ci": "npm run build && electron-builder --publish never",
     "publish:github": "npm run build && electron-builder --publish always",
     "preview": "vite preview"
   },

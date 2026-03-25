@@ -313,7 +313,9 @@ const App = () => {
       </header>
 
       <main className="layout">
-        <div className="helper-banner">Guncellemeler acilista otomatik kontrol edilir. Isterseniz yukaridaki butondan manuel denetim de baslatabilirsiniz.</div>
+        <div className="helper-banner">
+          <strong>Akilli guncelleme hazir.</strong> Guncellemeler acilista otomatik kontrol edilir. Isterseniz yukaridaki butondan manuel denetim de baslatabilirsiniz.
+        </div>
         {status === AppStatus.IDLE && !folder && (
           <section className="hero">
             <p className="eyebrow">PixelLocalLens Desktop</p>
