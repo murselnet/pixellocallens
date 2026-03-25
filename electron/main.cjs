@@ -14,6 +14,8 @@ let mainWindow = null;
 let updateDownloaded = false;
 let updateCheckInFlight = false;
 let lastUpdateCheckSource = 'background';
+let lastUpdateStatusSignature = '';
+let lastUpdateStatusAt = 0;
 
 const store = new Store({
   name: 'pixellocallens-desktop',
@@ -64,7 +66,34 @@ function sendUpdateStatus(payload) {
     return;
   }
 
+  const signature = JSON.stringify(payload);
+  const now = Date.now();
+  if (signature === lastUpdateStatusSignature && now - lastUpdateStatusAt < 2000) {
+    return;
+  }
+
+  lastUpdateStatusSignature = signature;
+  lastUpdateStatusAt = now;
+
   mainWindow.webContents.send('app:update-status', payload);
+}
+
+function mapUpdateErrorToStatus(error, source) {
+  const rawMessage = error?.message || 'Guncelleme sirasinda beklenmeyen bir hata olustu.';
+
+  if (rawMessage.includes('No published versions on GitHub')) {
+    return {
+      status: 'not-available',
+      message: 'GitHub tarafinda henuz publish edilmis bir release yok.',
+      source
+    };
+  }
+
+  return {
+    status: 'error',
+    message: rawMessage,
+    source
+  };
 }
 
 function setUpdateCheckState(isInFlight) {
@@ -150,11 +179,7 @@ function configureAutoUpdater() {
 
   autoUpdater.on('error', (error) => {
     setUpdateCheckState(false);
-    sendUpdateStatus({
-      status: 'error',
-      message: error?.message || 'Guncelleme sirasinda beklenmeyen bir hata olustu.',
-      source: lastUpdateCheckSource
-    });
+    sendUpdateStatus(mapUpdateErrorToStatus(error, lastUpdateCheckSource));
   });
 }
 
@@ -186,11 +211,13 @@ async function checkForUpdates(source = 'manual') {
     return { started: true };
   } catch (error) {
     setUpdateCheckState(false);
-    sendUpdateStatus({
-      status: 'error',
-      message: error?.message || 'Guncelleme kontrolu basarisiz oldu.',
-      source
-    });
+    const payload = mapUpdateErrorToStatus(error, source);
+    sendUpdateStatus(payload);
+
+    if (payload.status === 'not-available') {
+      return { started: false, reason: 'no-release' };
+    }
+
     throw error;
   }
 }

@@ -91,7 +91,8 @@ const App = () => {
         notify('Su anda zaten bir guncelleme kontrolu ya da indirme islemi suruyor.', 'info');
       }
     } catch (error) {
-      notify((error as Error).message, 'error');
+      const message = (error as Error).message;
+      notify(message.includes('No published versions on GitHub') ? 'GitHub tarafinda henuz publish edilmis bir release yok.' : message, 'error');
     }
   };
 
