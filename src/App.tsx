@@ -306,32 +306,36 @@ const App = () => {
 
         <div className="topbar__actions">
           {folder && (
-            <input
-              className="search-input"
-              placeholder="Dosya ara..."
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-            />
+            <div className="topbar__search">
+              <input
+                className="search-input"
+                placeholder="Dosya ara..."
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+              />
+            </div>
           )}
-          <button
-            className="secondary-button"
-            disabled={isUpdateBusy}
-            onClick={
-              updateStatus?.status === 'downloaded'
-                ? handleInstallUpdate
-                : canDownloadAndInstall
-                  ? handleDownloadAndInstallUpdate
-                  : handleCheckForUpdates
-            }
-          >
-            {updateButtonLabel}
-          </button>
-          <button className="secondary-button" onClick={handleChangeTargetDirectory}>
-            Hedef klasor sec
-          </button>
-          <button className="primary-button" onClick={handleOpenFolder}>
-            {folder ? 'Yeni klasor tara' : 'Klasor tara'}
-          </button>
+          <div className="topbar__buttons">
+            <button
+              className="secondary-button"
+              disabled={isUpdateBusy}
+              onClick={
+                updateStatus?.status === 'downloaded'
+                  ? handleInstallUpdate
+                  : canDownloadAndInstall
+                    ? handleDownloadAndInstallUpdate
+                    : handleCheckForUpdates
+              }
+            >
+              {updateButtonLabel}
+            </button>
+            <button className="secondary-button" onClick={handleChangeTargetDirectory}>
+              Hedef klasor sec
+            </button>
+            <button className="primary-button" onClick={handleOpenFolder}>
+              {folder ? 'Yeni klasor tara' : 'Klasor tara'}
+            </button>
+          </div>
         </div>
       </header>
 

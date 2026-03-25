@@ -7,7 +7,6 @@ const { autoUpdater } = require('electron-updater');
 const { imageSize } = require('image-size');
 
 const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif']);
-const defaultTargetDirectory = app.getPath('desktop');
 const windowIconPath = path.join(__dirname, '..', 'build', 'icon.png');
 const isDevelopment = !app.isPackaged;
 let mainWindow = null;
@@ -22,19 +21,38 @@ let updateInstallRequested = false;
 const store = new Store({
   name: 'pixellocallens-desktop',
   defaults: {
-    targetDirectory: defaultTargetDirectory
+    targetDirectory: app.getPath('desktop')
   }
 });
 
-function getStoredTargetDirectory() {
-  const storedTargetDirectory = store.get('targetDirectory');
+function getDefaultDesktopDirectory() {
+  return app.getPath('desktop');
+}
 
-  if (typeof storedTargetDirectory === 'string' && storedTargetDirectory.trim().length > 0) {
-    return storedTargetDirectory;
+async function resolveDirectoryOrDesktop(directoryPath) {
+  const desktopDirectory = getDefaultDesktopDirectory();
+
+  if (typeof directoryPath !== 'string' || directoryPath.trim().length === 0) {
+    return desktopDirectory;
   }
 
-  store.set('targetDirectory', defaultTargetDirectory);
-  return defaultTargetDirectory;
+  try {
+    const stats = await fs.stat(directoryPath);
+    return stats.isDirectory() ? directoryPath : desktopDirectory;
+  } catch (_error) {
+    return desktopDirectory;
+  }
+}
+
+async function getStoredTargetDirectory() {
+  const storedTargetDirectory = store.get('targetDirectory');
+  const resolvedTargetDirectory = await resolveDirectoryOrDesktop(storedTargetDirectory);
+
+  if (resolvedTargetDirectory !== storedTargetDirectory) {
+    store.set('targetDirectory', resolvedTargetDirectory);
+  }
+
+  return resolvedTargetDirectory;
 }
 
 function createWindow() {
@@ -334,7 +352,8 @@ async function scanDirectoryRecursive(rootDirectory, currentDirectory = rootDire
 async function openFolderDialog() {
   const window = BrowserWindow.getFocusedWindow();
   const result = await dialog.showOpenDialog(window, {
-    title: 'Taranacak klasÃ¶rÃ¼ seÃ§in',
+    title: 'Taranacak klasörü seçin',
+    defaultPath: getDefaultDesktopDirectory(),
     properties: ['openDirectory']
   });
 
@@ -357,7 +376,8 @@ async function openFolderDialog() {
 async function requestTargetDirectory() {
   const window = BrowserWindow.getFocusedWindow();
   const result = await dialog.showOpenDialog(window, {
-    title: 'Kaydedilecek hedef klasÃ¶rÃ¼ seÃ§in',
+    title: 'Kaydedilecek hedef klasörü seçin',
+    defaultPath: getDefaultDesktopDirectory(),
     properties: ['openDirectory']
   });
 
@@ -380,7 +400,7 @@ ipcMain.handle('media:copy-file', async (_event, payload) => {
     throw new Error('Kopyalanacak dosya bilgisi eksik.');
   }
 
-  const targetDirectory = getStoredTargetDirectory();
+  const targetDirectory = await getStoredTargetDirectory();
   const destinationPath = path.join(targetDirectory, fileName);
   await fs.copyFile(sourcePath, destinationPath);
 
@@ -396,7 +416,7 @@ ipcMain.handle('media:change-target-directory', async () => {
 });
 
 ipcMain.handle('media:get-target-directory', async () => {
-  return { targetDirectory: getStoredTargetDirectory() };
+  return { targetDirectory: await getStoredTargetDirectory() };
 });
 
 ipcMain.handle('media:open-in-explorer', async (_event, payload) => {
@@ -477,3 +497,4 @@ app.on('window-all-closed', () => {
 app.on('browser-window-created', (_event, window) => {
   mainWindow = window;
 });
+
