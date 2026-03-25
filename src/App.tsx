@@ -263,6 +263,14 @@ const App = () => {
       .map(([resolution, files]) => ({ label: resolution, files }));
   }, [filteredFiles, sortBy]);
 
+  const isUpdateBusy = updateStatus?.status === 'checking' || updateStatus?.status === 'downloading';
+  const updateButtonLabel =
+    updateStatus?.status === 'downloaded'
+      ? 'Guncellemeyi kur'
+      : isUpdateBusy
+        ? 'Guncelleme suruyor'
+        : 'Guncellemeleri kontrol et';
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -290,9 +298,10 @@ const App = () => {
           )}
           <button
             className="secondary-button"
+            disabled={isUpdateBusy}
             onClick={updateStatus?.status === 'downloaded' ? handleInstallUpdate : handleCheckForUpdates}
           >
-            {updateStatus?.status === 'downloaded' ? 'Guncellemeyi kur' : 'Guncellemeleri kontrol et'}
+            {updateButtonLabel}
           </button>
           <button className="secondary-button" onClick={handleChangeTargetDirectory}>
             Hedef klasor sec
@@ -304,6 +313,7 @@ const App = () => {
       </header>
 
       <main className="layout">
+        <div className="helper-banner">Guncellemeler acilista otomatik kontrol edilir. Isterseniz yukaridaki butondan manuel denetim de baslatabilirsiniz.</div>
         {status === AppStatus.IDLE && !folder && (
           <section className="hero">
             <p className="eyebrow">PixelLocalLens Desktop</p>
