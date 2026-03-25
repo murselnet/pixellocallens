@@ -72,6 +72,15 @@ Notlar:
 - `latest.yml` ve `.blockmap` dosyalari otomatik guncelleme sistemi icindir; elle indirilmesine gerek yoktur.
 - Uygulama kurulduktan sonra yeni surumler GitHub Releases uzerinden otomatik olarak algilanabilir.
 
+## Release Dosyalari Ne Ise Yarar?
+
+GitHub Releases altinda gorunen dosyalarin amaclari:
+
+- `PixelLocalLens-Desktop-Setup-x.y.z.exe`: Son kullanicinin indirip kurmasi gereken Windows kurulum dosyasidir.
+- `latest.yml`: Uygulamanin otomatik guncelleme kontrolu sirasinda okudugu metadata dosyasidir.
+- `PixelLocalLens-Desktop-Setup-x.y.z.exe.blockmap`: Otomatik guncelleme sirasinda daha verimli indirme icin kullanilan yardimci dosyadir.
+- `Source code (zip)` ve `Source code (tar.gz)`: GitHub'in otomatik olusturdugu kaynak kod arsivleridir; son kullanici kurulumu icin gerekli degildir.
+
 ## Gelistirme Ortami
 
 Gereksinimler:
