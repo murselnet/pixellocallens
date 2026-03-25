@@ -44,8 +44,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $tag = "${{ steps.version.outputs.tag }}"
-          gh release view $tag --repo "${{ github.repository }}" *> $null
-          if ($LASTEXITCODE -eq 0) {
+          $exists = $true
+          gh release view $tag --repo "${{ github.repository }}" 1>$null 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            $exists = $false
+            $global:LASTEXITCODE = 0
+          }
+
+          if ($exists) {
             "exists=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
             "Release $tag already exists. Skipping build and publish." >> $env:GITHUB_STEP_SUMMARY
           } else {
