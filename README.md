@@ -1,37 +1,37 @@
 # PixelLocalLens Desktop
 
-PixelLocalLens Desktop, Windows uzerinde calisan bir masaustu uygulamasidir. Yerel klasorlerdeki gorselleri ve alt klasorleri tarar; dosyalari cozunurluk, boyut, tarih ve isim gibi kriterlere gore siralamanizi saglar. Amac, cok sayida gorsel arasinda hizli secim yapmak, buyuk onizleme almak ve ihtiyac duyulan dosyalari tek tikla hedef klasore kopyalamaktir.
+PixelLocalLens Desktop, Windows üzerinde çalışan bir masaüstü uygulamasıdır. Yerel klasörlerdeki görselleri ve alt klasörleri tarar; dosyaları çözünürlük, boyut, tarih ve isim gibi kriterlere göre sıralamanızı sağlar. Amaç, çok sayıda görsel arasında hızlı seçim yapmak, büyük önizleme almak ve ihtiyaç duyulan dosyaları tek tıkla hedef klasöre kopyalamaktır.
 
-Bu repo su anda sadece masaustu uygulamasini icerir.
+Bu repo şu anda sadece masaüstü uygulamasını içerir.
 
 ## Neler Sunar?
 
-- Alt klasorler dahil secilen klasoru recursive olarak tarar.
-- `JPG`, `JPEG`, `PNG`, `WEBP` ve `GIF` dosyalarini listeler.
-- Gorselleri cozunurluge gore gruplandirir.
-- Isim, dosya boyutu, degistirilme tarihi ve cozunurluge gore siralama sunar.
-- Yatay, dikey ve kare gorseller icin filtreleme yapar.
-- Dosya adina gore hizli arama yapar.
-- Buyuk gorsel onizlemesi acar.
-- Dosyayi Windows Explorer icinde buldurabilir.
-- Secilen gorseli belirlenen hedef klasore kopyalar.
-- Hedef klasor bilgisini yerel olarak saklar.
-- GitHub Releases tabanli uygulama guncelleme akisini destekler.
+- Alt klasörler dahil seçilen klasörü recursive olarak tarar.
+- `JPG`, `JPEG`, `PNG`, `WEBP` ve `GIF` dosyalarını listeler.
+- Görselleri çözünürlüğe göre gruplandırır.
+- İsim, dosya boyutu, değiştirilme tarihi ve çözünürlüğe göre sıralama sunar.
+- Yatay, dikey ve kare görseller için filtreleme yapar.
+- Dosya adına göre hızlı arama yapar.
+- Büyük görsel önizlemesi açar.
+- Dosyayı Windows Explorer içinde buldurabilir.
+- Seçilen görseli belirlenen hedef klasöre kopyalar.
+- Hedef klasör bilgisini yerel olarak saklar.
+- GitHub Releases tabanlı uygulama güncelleme akışını destekler.
 
-## Kullanim Senaryosu
+## Kullanım Senaryosu
 
-PixelLocalLens ozellikle su tip ihtiyaclar icin uygundur:
+PixelLocalLens özellikle şu tip ihtiyaçlar için uygundur:
 
-- Buyuk bir gorsel arsivinde dogru dosyayi hizli bulmak
-- Farkli cozunurlukteki gorselleri ayiklamak
-- Tasarim, e-ticaret veya medya klasorlerinde secim yapmak
-- Yerel dosyalari baska bir klasore hizlica toplamak
+- Büyük bir görsel arşivinde doğru dosyayı hızlı bulmak
+- Farklı çözünürlükteki görselleri ayıklamak
+- Tasarım, e-ticaret veya medya klasörlerinde seçim yapmak
+- Yerel dosyaları başka bir klasöre hızlıca toplamak
 
-## Teknik Ozet
+## Teknik Özet
 
-Uygulama Electron tabanli bir Windows desktop deneyimi sunar. Arayuz React ile gelistirilmistir; renderer tarafi Vite ile calisir. Dosya sistemi tarama, klasor secimi, Explorer entegrasyonu ve otomatik guncelleme kontrolleri Electron main process tarafinda yonetilir.
+Uygulama Electron tabanlı bir Windows desktop deneyimi sunar. Arayüz React ile geliştirilmiştir; renderer tarafı Vite ile çalışır. Dosya sistemi tarama, klasör seçimi, Explorer entegrasyonu ve otomatik güncelleme kontrolleri Electron main process tarafında yönetilir.
 
-Kullanilan temel teknolojiler:
+Kullanılan temel teknolojiler:
 
 - Electron `37.2.0`
 - React `19.0.0`
@@ -42,25 +42,25 @@ Kullanilan temel teknolojiler:
 - electron-updater `6.8.3`
 - electron-store `10.1.0`
 
-## Proje Yapisi
+## Proje Yapısı
 
 ```text
 .
 |-- electron/       # Main process, preload ve native entegrasyonlar
-|-- src/            # React arayuzu
-|-- public/         # Statik varliklar
-|-- build/          # Uygulama ikonlari ve paketleme girdileri
-|-- dist/           # Web build ciktisi
-`-- release/        # Installer ve release artefact'lari
+|-- src/            # React arayüzü
+|-- public/         # Statik varlıklar
+|-- build/          # Uygulama ikonları ve paketleme girdileri
+|-- dist/           # Web build çıktısı
+`-- release/        # Installer ve release artefact'ları
 ```
 
-## Gelistirme Ortami
+## Geliştirme Ortamı
 
 Gereksinimler:
 
-- Node.js 20+ onerilir
+- Node.js 20+ önerilir
 - npm 10+
-- Windows ortaminda gelistirme onerilir
+- Windows ortamında geliştirme önerilir
 
 Kurulum:
 
@@ -68,7 +68,7 @@ Kurulum:
 npm install
 ```
 
-Gelistirme modunda calistirma:
+Geliştirme modunda çalıştırma:
 
 ```bash
 npm run dev
@@ -76,31 +76,31 @@ npm run dev
 
 Bu komut:
 
-- Vite gelistirme sunucusunu baslatir
-- Electron uygulamasini gelistirme modunda acar
-- Arayuz ve desktop katmanini birlikte calistirir
+- Vite geliştirme sunucusunu başlatır
+- Electron uygulamasını geliştirme modunda açar
+- Arayüz ve desktop katmanını birlikte çalıştırır
 
 ## Build ve Paketleme
 
-Uretim build'i almak icin:
+Üretim build'i almak için:
 
 ```bash
 npm run build
 ```
 
-Windows installer olusturmak icin:
+Windows installer oluşturmak için:
 
 ```bash
 npm run dist
 ```
 
-Paketleme sonrasi ciktilar varsayilan olarak `release/` klasorune yazilir.
+Paketleme sonrası çıktılar varsayılan olarak `release/` klasörüne yazılır.
 
-## GitHub Release ve Guncelleme Akisi
+## GitHub Release ve Güncelleme Akışı
 
-Proje `electron-builder` ve `electron-updater` ile GitHub Releases uzerinden guncelleme dagitimi icin hazirlanmistir.
+Proje `electron-builder` ve `electron-updater` ile GitHub Releases üzerinden güncelleme dağıtımı için hazırlanmıştır.
 
-Yayin akisi:
+Yayın akışı:
 
 ```bash
 npm run publish:github
@@ -108,27 +108,27 @@ npm run publish:github
 
 Bu komut:
 
-- production build olusturur
-- Windows installer paketini uretir
-- GitHub uzerinde draft release olusturur
-- gerekli release dosyalarini yukler
+- production build oluşturur
+- Windows installer paketini üretir
+- GitHub üzerinde draft release oluşturur
+- gerekli release dosyalarını yükler
 
-Uygulama paketli modda calistiginda:
+Uygulama paketli modda çalıştığında:
 
-- arka planda guncelleme kontrolu yapabilir
-- yeni surum bulundugunda indirme surecini baslatir
-- indirme tamamlandiginda kuruluma hazir hale gelir
+- arka planda güncelleme kontrolü yapabilir
+- yeni sürüm bulunduğunda indirme sürecini başlatır
+- indirme tamamlandığında kuruluma hazır hale gelir
 
-## Desteklenen Ozellikler
+## Desteklenen Özellikler
 
-- Recursive klasor tarama
+- Recursive klasör tarama
 - Yerel dosya metadata okuma
-- Cozunurluk bazli gruplama
-- Buyuk onizleme penceresi
-- Kayitli hedef klasor tercihi
-- Explorer ile dosya konumunu acma
-- GitHub tabanli auto-update
+- Çözünürlük bazlı gruplama
+- Büyük önizleme penceresi
+- Kayıtlı hedef klasör tercihi
+- Explorer ile dosya konumunu açma
+- GitHub tabanlı auto-update
 
 ## Lisans
 
-Bu projenin `package.json` dosyasinda lisans alani su anda `UNLICENSED` olarak tanimlidir. Public repo olarak yayinlanmadan once uygun lisansin acikca eklenmesi onerilir.
+Bu projenin `package.json` dosyasında lisans alanı şu anda `UNLICENSED` olarak tanımlıdır. Public repo olarak yayınlanmadan önce uygun lisansın açıkça eklenmesi önerilir.
