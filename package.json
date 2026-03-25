@@ -1,6 +1,6 @@
 {
   "name": "pixellocallens-desktop",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "PixelLocalLens masaustu uygulamasi ile klasorlerdeki gorselleri tarayin, onizleyin ve hizlica hedef klasore kopyalayin.",
   "author": "Projehub",
   "private": true,

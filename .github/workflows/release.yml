@@ -66,6 +66,14 @@ jobs:
         if: steps.release_check.outputs.exists != 'true'
         run: npm run dist:ci
 
+      - name: Normalize Release Asset Names
+        if: steps.release_check.outputs.exists != 'true'
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.value }}"
+          Copy-Item "release/PixelLocalLens Desktop Setup $version.exe" "release/PixelLocalLens-Desktop-Setup-$version.exe" -Force
+          Copy-Item "release/PixelLocalLens Desktop Setup $version.exe.blockmap" "release/PixelLocalLens-Desktop-Setup-$version.exe.blockmap" -Force
+
       - name: Publish GitHub Release
         if: steps.release_check.outputs.exists != 'true'
         shell: pwsh
@@ -74,13 +82,13 @@ jobs:
         run: |
           $version = "${{ steps.version.outputs.value }}"
           $tag = "${{ steps.version.outputs.tag }}"
-          $exePath = "release/PixelLocalLens Desktop Setup $version.exe"
-          $blockmapPath = "release/PixelLocalLens Desktop Setup $version.exe.blockmap"
+          $exePath = "release/PixelLocalLens-Desktop-Setup-$version.exe"
+          $blockmapPath = "release/PixelLocalLens-Desktop-Setup-$version.exe.blockmap"
 
           gh release create $tag `
-            "release/latest.yml#latest.yml" `
-            "$exePath#PixelLocalLens-Desktop-Setup-$version.exe" `
-            "$blockmapPath#PixelLocalLens-Desktop-Setup-$version.exe.blockmap" `
+            "release/latest.yml" `
+            "$exePath" `
+            "$blockmapPath" `
             --repo "${{ github.repository }}" `
             --title "$version" `
             --target "${{ github.sha }}" `
